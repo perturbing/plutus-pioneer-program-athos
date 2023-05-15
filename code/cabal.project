@@ -26,6 +26,7 @@ packages:
     Week06
     Week08
     Week09
+    Certification
 
 -- We never, ever, want this.
 write-ghc-environment-files: never
@@ -193,3 +194,10 @@ source-repository-package
    type: git                                                                                                                         
    location: https://github.com/geniusyield/plutus-simple-model
    tag: d710c4c5400ff7072fe89c337c1cdd0128dc5d99
+
+-- library for Merkle tree from Hydra
+source-repository-package
+   type: git                                                                                                                         
+   location: https://github.com/input-output-hk/hydra
+   tag: 0fab58f97b7ac955e8578215848e30b444cef8cb
+   subdir: plutus-merkle-tree
