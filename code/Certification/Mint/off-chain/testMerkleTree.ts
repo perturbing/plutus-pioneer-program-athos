@@ -31,7 +31,7 @@ const merkleTree = new L.MerkleTree(dataUint);
 const merkleRoot: Hash = { hash: L.toHex(merkleTree.rootHash())};
 
 // a test member and proof
-const n = 2;
+const n = 3;
 const member = L.fromText(data[n])
 const merkleProof1 : MerkleProof = merkleTree.getProof(dataUint[n]).map((p) =>
   p.left
@@ -63,7 +63,7 @@ async function mint(name: string): Promise<L.TxHash> {
   const tkn: L.Unit = L.toUnit(policyId,L.fromText(name),222);
   const tx = await lucid
     .newTx()
-    .mintAssets({ [tkn]: 1n}, L.Data.to<Redeemer>({member:member,merkleProof:merkleProof1},Redeemer))//to<Redeemer>({value: [member,merkleProof1]},Redeemer))
+    .mintAssets({ [tkn]: 1n}, L.Data.to<Redeemer>({member:member,merkleProof:merkleProof1},Redeemer))
     .attachMintingPolicy(mintingScript)
     .complete();
   const signedTx = await tx.sign().complete();
@@ -71,4 +71,7 @@ async function mint(name: string): Promise<L.TxHash> {
   return signedTx.submit();
 }
 
-console.log(await mint("testTKN"));
+console.log(await mint(""));
+
+
+
