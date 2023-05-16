@@ -29,20 +29,21 @@ const policyIdFree: L.PolicyId = lucid.utils.mintingPolicyToId(mintingScriptFree
 // import always fail validator (this locks the reference token)
 const validatorAlwaysFail: L.SpendingValidator = await readScript("AlwaysFail.plutus");
 const addressAlwaysFail: L.Address = lucid.utils.validatorToAddress(validatorAlwaysFail);
-const details: L.AddressDetails = L.getAddressDetails(addressAlwaysFail)
+const details: L.AddressDetails = L.getAddressDetails(addressAlwaysFail);
 
 // setup parameters
 const root: Types.Hash = {hash: "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"};
 const prefix1: Types.Prefix = L.toLabel(222);
 const prefix2: Types.Prefix = L.toLabel(100);
-const address: Types.Address = {addressCredential: details.paymentCredential}
+const addrAlwaysFail: Types.Address = {addressCredential: { ScriptCredential: [details.paymentCredential.hash] }, addressStakingCredential: null};
+
 const parameters: Types.Parameters = {
     merkleRoot: root,
     prefix1: prefix1,
     prefix2: prefix1,
-    threadSymbol: policyIdFree
+    threadSymbol: policyIdFree,
+    lockAddress: addrAlwaysFail
 }
-console.log(L.Data.to<Types.Address>(address,Types.Address))
 
 // import NFT minting policy and apply above parameters
 const Params = L.Data.Tuple([Types.Parameters]);
@@ -56,6 +57,7 @@ async function readNFTPolicy(): Promise<L.MintingPolicy> {
 }
 const mintingScriptNFT: L.MintingPolicy = await readNFTPolicy();
 const policyIdNFT: L.PolicyId = lucid.utils.mintingPolicyToId(mintingScriptNFT);
+console.log(policyIdNFT)
 
 async function mint(name: string): Promise<L.TxHash> {
     const tkn: L.Unit = L.toUnit(policyIdNFT,L.fromText(name),222);
@@ -69,4 +71,3 @@ async function mint(name: string): Promise<L.TxHash> {
     return signedTx.submit();
 }
 //console.log(await mint("test"))
-

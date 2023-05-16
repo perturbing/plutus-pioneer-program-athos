@@ -25,11 +25,11 @@ import qualified Plutus.MerkleTree    as MT
 -- | The minting policy that upon burning of the thread token + a merkle proof of the datum, mints the PPP NFT.
 
 data Parameters = Parameters {
-      merkleRoot    :: MT.Hash             -- the merkle root of the NFT metadata (member = pubkeyhash <> datumHash)
-    , prefix1       :: BuiltinByteString   -- the (222) nft prefix 
-    , prefix2       :: BuiltinByteString   -- the (100) ref prefix 
-    , threadSymbol  :: CurrencySymbol      -- the currency symbol of the thread token
---    , lockAddres    :: Address             -- the address to lock the reference NFT at
+      merkleRoot        :: MT.Hash             -- the merkle root of the NFT metadata (member = pubkeyhash <> datumHash)
+    , prefix1           :: BuiltinByteString   -- the (222) nft prefix 
+    , prefix2           :: BuiltinByteString   -- the (100) ref prefix 
+    , threadSymbol      :: CurrencySymbol      -- the currency symbol of the thread token
+    , lockAddress       :: Address             -- the address to lock the reference NFT at
 }
 makeIsDataIndexed ''Parameters [('Parameters,0)]
 
