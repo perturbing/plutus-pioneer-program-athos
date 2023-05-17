@@ -1,6 +1,19 @@
 import * as L from "https://deno.land/x/lucid@0.10.1/mod.ts";
 import * as Types from "./types.ts"
 import { secretSeed } from "./seed.ts";
+import metadata from "../data/generic_metadata.json" assert { type: "json" };
+import * as mod from "https://deno.land/std@0.182.0/crypto/mod.ts";
+import {decode} from "https://deno.land/std/encoding/hex.ts";
+
+// cardano uses blake2b hash function for plutus data
+async function blake2bHash(input:string): Promise<string> {
+  const digest = await mod.crypto.subtle.digest(
+    "BLAKE2B-256",
+    decode(new TextEncoder().encode(input))
+  );
+  const string = mod.toHashString(digest)
+  return string
+}
 
 // set blockfrost endpoint
 const lucid = await L.Lucid.new(
@@ -13,6 +26,7 @@ const lucid = await L.Lucid.new(
 
 lucid.selectWalletFromSeed(secretSeed);
 const addr: L.Address = await lucid.wallet.address();
+const pkh: string = L.getAddressDetails(addr).paymentCredential.hash;
 
 async function readScript(name: string): Promise<L.MintingPolicy> {
     const validator = JSON.parse(await Deno.readTextFile("Mint/assets/"+ name))
@@ -31,16 +45,35 @@ const validatorAlwaysFail: L.SpendingValidator = await readScript("AlwaysFail.pl
 const addressAlwaysFail: L.Address = lucid.utils.validatorToAddress(validatorAlwaysFail);
 const details: L.AddressDetails = L.getAddressDetails(addressAlwaysFail);
 
+// nft datum stuff
+const metadataDatum = L.Data.fromJson(metadata);
+const datumPlutusData = L.Data.to(new L.Constr(0,[metadataDatum]))
+const datumHash = await blake2bHash(datumPlutusData)
+
+// merkle tree stuff
+const data = [pkh + datumHash,pkh + datumHash];
+const dataUint = data.map( (a) => L.fromHex(a));
+const merkleTree = new L.MerkleTree(dataUint);
+const merkleRoot: Types.Hash = { hash: L.toHex(merkleTree.rootHash())};
+
+// a test member and proof
+const n = 1;
+const member = L.fromText(data[n])
+const merkleProof1 : Types.MerkleProof = merkleTree.getProof(dataUint[n]).map((p) =>
+  p.left
+    ? { Left: [{ hash: L.toHex(p.left) }] }
+    : { Right: [{ hash: L.toHex(p.right!) }] }
+)
+
 // setup parameters
-const root: Types.Hash = {hash: "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"};
-const prefix1: Types.Prefix = L.toLabel(222);
-const prefix2: Types.Prefix = L.toLabel(100);
+const prefixNFT: Types.Prefix = L.toLabel(222);
+const prefixRef: Types.Prefix = L.toLabel(100);
 const addrAlwaysFail: Types.Address = {addressCredential: { ScriptCredential: [details.paymentCredential.hash] }, addressStakingCredential: null};
 
 const parameters: Types.Parameters = {
-    merkleRoot: root,
-    prefix1: prefix1,
-    prefix2: prefix1,
+    merkleRoot: merkleRoot,
+    prefixNFT: prefixNFT,
+    prefixRef: prefixRef,
     threadSymbol: policyIdFree,
     lockAddress: addrAlwaysFail
 }
@@ -57,17 +90,40 @@ async function readNFTPolicy(): Promise<L.MintingPolicy> {
 }
 const mintingScriptNFT: L.MintingPolicy = await readNFTPolicy();
 const policyIdNFT: L.PolicyId = lucid.utils.mintingPolicyToId(mintingScriptNFT);
-console.log(policyIdNFT)
+console.log("PolicyID: "+policyIdNFT)
 
-async function mint(name: string): Promise<L.TxHash> {
-    const tkn: L.Unit = L.toUnit(policyIdNFT,L.fromText(name),222);
+async function mintPKHToken(): Promise<L.TxHash> {
+  const tkn: L.Unit = L.toUnit(policyIdFree,pkh);
+  const tx = await lucid
+    .newTx()
+    .mintAssets({ [tkn]: 1n}, L.Data.void())
+    .attachMintingPolicy(mintingScriptFree)
+    .complete();
+  const signedTx = await tx.sign().complete();
+ 
+  return signedTx.submit();
+}
+//console.log(await mintPKHToken());
+
+const Redeemer = L.Data.Object({proof: Types.MerkleProof})
+type Redeemer = L.Data.Static<typeof Redeemer>
+
+const redeemer: Redeemer = {proof: merkleProof1}
+
+async function mint(): Promise<L.TxHash> {
+    const threadTkn: L.Unit = L.toUnit(policyIdFree,pkh);
+    const userTkn: L.Unit = L.toUnit(policyIdNFT,pkh,222);
+    const refTkn: L.Unit = L.toUnit(policyIdNFT,pkh,100)
     const tx = await lucid
       .newTx()
-      .mintAssets({ [tkn]: 1n}, L.Data.to<Types.Hash>(root,Types.Hash))
+      .mintAssets({ [userTkn]: 1n, [refTkn]: 1n},  L.Data.to<Redeemer>(redeemer,Redeemer))
       .attachMintingPolicy(mintingScriptNFT)
+      .mintAssets({ [threadTkn]:-1n }, L.Data.void())
+      .attachMintingPolicy(mintingScriptFree)
+      .payToContract(addressAlwaysFail, L.Data.to(new L.Constr(0,[metadataDatum])),{[refTkn]: 1n})
       .complete();
     const signedTx = await tx.sign().complete();
    
     return signedTx.submit();
 }
-//console.log(await mint("test"))
+//console.log(await mint())

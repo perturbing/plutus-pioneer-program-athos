@@ -1,6 +1,5 @@
 import * as L from "https://deno.land/x/lucid@0.10.1/mod.ts";
 
-
 // The type of a hash with the constraint that it must be of the exact size of 32 bytes
 export const Hash = L.Data.Object({
     hash: L.Data.Bytes({ minLength: 32, maxLength: 32 }),
@@ -60,8 +59,8 @@ export type Address = L.Data.Static<typeof Address>;
 // The type of the Parameters for the NFT policy
 export const Parameters = L.Data.Object({
     merkleRoot: Hash,
-    prefix1: Prefix,
-    prefix2: Prefix,
+    prefixNFT: Prefix,
+    prefixRef: Prefix,
     threadSymbol: CurrencySymbol,
     lockAddress: Address
 });
