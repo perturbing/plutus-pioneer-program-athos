@@ -42,13 +42,13 @@ async function readScript(name: string): Promise<L.MintingPolicy> {
 }
 
 // import always true minting policy (replace for threadtoken policy)
-const mintingScriptFree: L.MintingPolicy = await readScript("alwaysTrue.plutus");
+const mintingScriptFree: L.MintingPolicy = await readScript("alwaysTrue-policy.plutus");
 const policyIdFree: L.PolicyId = lucid.utils.mintingPolicyToId(mintingScriptFree);
 
-// import always fail validator (this locks the reference token)
-const validatorAlwaysFail: L.SpendingValidator = await readScript("alwaysFalse.plutus");
-const addressAlwaysFail: L.Address = lucid.utils.validatorToAddress(validatorAlwaysFail);
-const details: L.AddressDetails = L.getAddressDetails(addressAlwaysFail);
+// import the locking validator (this locks the reference token)
+const lockingValidator: L.SpendingValidator = await readScript("lockingValidator.plutus");
+const lockingAddress: L.Address = lucid.utils.validatorToAddress(lockingValidator);
+const lockingAddressDetails: L.AddressDetails = L.getAddressDetails(lockingAddress);
 
 // generate NFT metadatum for participant
 
@@ -87,7 +87,7 @@ const merkleProof1 : Types.MerkleProof = merkleTree.getProof(dataUint[n]).map((p
 // setup parameters
 const prefixNFT: Types.Prefix = L.toLabel(222);
 const prefixRef: Types.Prefix = L.toLabel(100);
-const addrAlwaysFail: Types.Address = {addressCredential: { ScriptCredential: [details.paymentCredential.hash] }, addressStakingCredential: null};
+const addrAlwaysFail: Types.Address = {addressCredential: { ScriptCredential: [lockingAddressDetails.paymentCredential.hash] }, addressStakingCredential: null};
 
 const parameters: Types.Parameters = {
     merkleRoot: merkleRoot,
@@ -139,11 +139,11 @@ async function mint(): Promise<L.TxHash> {
       .attachMintingPolicy(mintingScriptNFT)
       .mintAssets({ [threadTkn]:-1n }, L.Data.void())
       .attachMintingPolicy(mintingScriptFree)
-      .payToContract(addressAlwaysFail, L.Data.to(new L.Constr(0,[L.Data.fromJson(genImageParticipant(particpantsName))])),{[refTkn]: 1n})
+      .payToContract(lockingAddress, L.Data.to(new L.Constr(0,[L.Data.fromJson(genImageParticipant(particpantsName))])),{[refTkn]: 1n})
       .addSignerKey(pkh)
       .complete();
     const signedTx = await tx.sign().complete();
    
     return signedTx.submit();
 }
-console.log(await mint())
+//console.log(await mint())

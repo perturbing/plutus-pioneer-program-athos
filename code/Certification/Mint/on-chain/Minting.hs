@@ -7,7 +7,6 @@
 {-# LANGUAGE NamedFieldPuns    #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use id" #-}
-{-# HLINT ignore "Avoid lambda using `infix`" #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 module Minting where
@@ -26,7 +25,7 @@ import PlutusTx.Maybe                 ( Maybe(Nothing), isJust, maybe )
 import PlutusTx.Eq                    ( Eq(..) )
 import           PlutusTx.Prelude     (Bool (..),BuiltinByteString,($),(&&),Integer, error,
                                       otherwise, (<>),(<$>),find,foldr,
-                                      map,elem, traceIfFalse, negate)
+                                      map,elem, negate)
 import           Utilities            (wrapPolicy, writeCodeToFile,writePolicyToFile,currencySymbol,
                                       writeValidatorToFile, wrapValidator)
 import           Prelude              (IO)
@@ -154,20 +153,21 @@ freePolicy :: MintingPolicy
 freePolicy = mkMintingPolicyScript $$(compile [|| mkWrappedFree ||])
 
 saveFreePolicy :: IO ()
-saveFreePolicy = writePolicyToFile "assets/alwaysTrue.plutus" freePolicy
+saveFreePolicy = writePolicyToFile "assets/alwaysTrue-policy.plutus" freePolicy
 
 freeCurrencySymbol :: CurrencySymbol
 freeCurrencySymbol = currencySymbol freePolicy
 
-instance (Eq a, Eq b, Eq c) => Eq (a, b,c) where
-    {-# INLINABLE (==) #-}
-    (a, b, c) == (a', b',c') = a == a' && b == b' && c==c'
 
 --------------------- The always fail validator -------------
--- | TO DO: create a locking script that allows to spend, if above m at script is burned
-{-# INLINABLE  mkAlwaysFail #-}
-mkAlwaysFail :: BuiltinData -> () -> ScriptContext -> Bool
-mkAlwaysFail _dat _red ctx = traceIfFalse "test" $ foldr (&&) True $ map (\(x,y,z) -> elem (x,y, negate z) (flattenValue mintedVal)) (flattenValue ownValue)
+-- create a Eq instance for a triple (a,b,c)
+instance (Eq a, Eq b, Eq c) => Eq (a, b, c) where
+    {-# INLINABLE (==) #-}
+    (a, b, c) == (a', b', c') = a == a' && b == b' && c == c'
+
+{-# INLINABLE  mkLockingScript #-}
+mkLockingScript :: BuiltinData -> () -> ScriptContext -> Bool
+mkLockingScript _dat _red ctx = foldr (&&) True $ map (\(x,y,z) -> elem (x,y, negate z) (flattenValue mintedVal)) (flattenValue ownValue)
     where
         -- `txInfo` is the transaction information of the current transaction context.
         txInfo :: TxInfo
@@ -189,12 +189,12 @@ mkAlwaysFail _dat _red ctx = traceIfFalse "test" $ foldr (&&) True $ map (\(x,y,
         ownValue = Value {getValue = delete adaSymbol (getValue (txOutValue refUtxo))}
 
 
-{-# INLINABLE  mkWrappedAlwaysFail #-}
-mkWrappedAlwaysFail :: BuiltinData -> BuiltinData -> BuiltinData -> ()
-mkWrappedAlwaysFail = wrapValidator mkAlwaysFail
+{-# INLINABLE  mkWrappedLockingScript #-}
+mkWrappedLockingScript :: BuiltinData -> BuiltinData -> BuiltinData -> ()
+mkWrappedLockingScript = wrapValidator mkLockingScript
 
-alwaysFail :: Validator
-alwaysFail = mkValidatorScript $$(compile [|| mkWrappedAlwaysFail ||])
+lockingValidator :: Validator
+lockingValidator = mkValidatorScript $$(compile [|| mkWrappedLockingScript ||])
 
-saveAlwaysFail :: IO ()
-saveAlwaysFail = writeValidatorToFile "assets/alwaysFalse.plutus" alwaysFail
+saveLockingValidator :: IO ()
+saveLockingValidator = writeValidatorToFile "assets/lockingValidator.plutus" lockingValidator

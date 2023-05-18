@@ -42,13 +42,13 @@ async function readScript(name: string): Promise<L.MintingPolicy> {
 }
 
 // import always true minting policy (replace for threadtoken policy)
-const mintingScriptFree: L.MintingPolicy = await readScript("alwaysTrue.plutus");
+const mintingScriptFree: L.MintingPolicy = await readScript("alwaysTrue-policy.plutus");
 const policyIdFree: L.PolicyId = lucid.utils.mintingPolicyToId(mintingScriptFree);
 
-// import always fail validator (this locks the reference token)
-const validatorAlwaysFail: L.SpendingValidator = await readScript("alwaysFalse.plutus");
-const addressAlwaysFail: L.Address = lucid.utils.validatorToAddress(validatorAlwaysFail);
-const details: L.AddressDetails = L.getAddressDetails(addressAlwaysFail);
+// import the locking validator (this locks the reference token)
+const lockingValidator: L.SpendingValidator = await readScript("lockingValidator.plutus");
+const lockingAddress: L.Address = lucid.utils.validatorToAddress(lockingValidator);
+const lockingAddressDetails: L.AddressDetails = L.getAddressDetails(lockingAddress);
 
 // generate NFT metadatum for participant
 
@@ -87,7 +87,7 @@ const merkleProof1 : Types.MerkleProof = merkleTree.getProof(dataUint[n]).map((p
 // setup parameters
 const prefixNFT: Types.Prefix = L.toLabel(222);
 const prefixRef: Types.Prefix = L.toLabel(100);
-const addrAlwaysFail: Types.Address = {addressCredential: { ScriptCredential: [details.paymentCredential.hash] }, addressStakingCredential: null};
+const addrAlwaysFail: Types.Address = {addressCredential: { ScriptCredential: [lockingAddressDetails.paymentCredential.hash] }, addressStakingCredential: null};
 
 const parameters: Types.Parameters = {
     merkleRoot: merkleRoot,
@@ -113,14 +113,14 @@ const policyIdNFT: L.PolicyId = lucid.utils.mintingPolicyToId(mintingScriptNFT);
 async function burn(): Promise<L.TxHash> {
     const dtm: L.Datum = L.Data.to(new L.Constr(0,[L.Data.fromJson(genImageParticipant(particpantsName))]))
     const dtmHash = await blake2bHash(dtm)
-    const utxoAtScript: L.UTxO[] = await lucid.utxosAt(addressAlwaysFail);
+    const utxoAtScript: L.UTxO[] = await lucid.utxosAt(lockingAddress);
     const ourUTxO: L.UTxO[] = utxoAtScript.filter((utxo) => utxo.datumHash == dtmHash);
     const userTkn: L.Unit = L.toUnit(policyIdNFT,pkh,222);
     const refTkn: L.Unit = L.toUnit(policyIdNFT,pkh,100)
     const tx = await lucid
       .newTx()
       .collectFrom(ourUTxO, L.Data.void())
-      .attachSpendingValidator(validatorAlwaysFail)
+      .attachSpendingValidator(lockingValidator)
       .mintAssets({ [userTkn]: -1n, [refTkn]: -1n},  L.Data.to(new L.Constr(1,[pkh])))
       .attachMintingPolicy(mintingScriptNFT)
       .complete();
