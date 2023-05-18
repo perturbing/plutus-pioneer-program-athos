@@ -1,7 +1,8 @@
 import * as L from "https://deno.land/x/lucid@0.10.1/mod.ts";
 import * as Types from "./types.ts"
 import { secretSeed } from "./seed.ts";
-import metadata from "../data/generic_metadata.json" assert { type: "json" };
+import metadata from "../../Data/generic_metadata.json" assert { type: "json" };
+import merkleData from "../../Data/merkleData.ts";
 import * as mod from "https://deno.land/std@0.182.0/crypto/mod.ts";
 import {decode} from "https://deno.land/std/encoding/hex.ts";
 
@@ -64,6 +65,7 @@ const merkleProof1 : Types.MerkleProof = merkleTree.getProof(dataUint[n]).map((p
     ? { Left: [{ hash: L.toHex(p.left) }] }
     : { Right: [{ hash: L.toHex(p.right!) }] }
 )
+console.log(data[n])
 
 // setup parameters
 const prefixNFT: Types.Prefix = L.toLabel(222);
