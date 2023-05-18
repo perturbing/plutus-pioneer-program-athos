@@ -119,7 +119,7 @@ async function burn(): Promise<L.TxHash> {
     const refTkn: L.Unit = L.toUnit(policyIdNFT,pkh,100)
     const tx = await lucid
       .newTx()
-      .collectFrom([ourUTxO[2]], L.Data.void())
+      .collectFrom(ourUTxO, L.Data.void())
       .attachSpendingValidator(validatorAlwaysFail)
       .mintAssets({ [userTkn]: -1n, [refTkn]: -1n},  L.Data.to(new L.Constr(1,[pkh])))
       .attachMintingPolicy(mintingScriptNFT)

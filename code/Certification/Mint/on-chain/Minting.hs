@@ -8,21 +8,25 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use id" #-}
 {-# HLINT ignore "Avoid lambda using `infix`" #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 
 module Minting where
 
-import           Plutus.V2.Ledger.Api (BuiltinData, PubKeyHash, ScriptContext,CurrencySymbol,
+import           Plutus.V2.Ledger.Api (BuiltinData, ScriptContext,CurrencySymbol,
                                        MintingPolicy, mkMintingPolicyScript, mkValidatorScript,
-                                       Validator, Address, ScriptContext (..), TxInfo (..),
+                                       Validator, Address (Address), ScriptContext (..), TxInfo (..),
                                        TxInInfo (..), TokenName (..), Value (..),TxOut,txOutValue,
-                                       txOutAddress,txOutDatum,OutputDatum (..), DatumHash (..), TxOut (..),
-                                       Datum (..),PubKeyHash (..),adaSymbol)
-import           Plutus.V2.Ledger.Contexts (ownCurrencySymbol, findDatum,txSignedBy)
+                                       txOutAddress,txOutDatum,OutputDatum (..), DatumHash (..), TxOut (..),adaSymbol,Credential (..),addressCredential,
+                                       addressStakingCredential,PubKeyHash (..))
+import           Plutus.V2.Ledger.Contexts (ownCurrencySymbol, findDatum,txSignedBy,ownHash)
 import           PlutusTx             (compile, makeIsDataIndexed, CompiledCode, unsafeFromBuiltinData)
-import           PlutusTx.AssocMap
-import           PlutusTx.Maybe
-import           PlutusTx.Prelude     (Bool (..),BuiltinByteString,(==),($),(&&),Integer, error,
-                                      otherwise, (<>),(<$>),find,foldr,traceIfFalse,(>),length)
+import Plutus.V1.Ledger.Value         (flattenValue)
+import PlutusTx.AssocMap              ( delete, empty, insert, keys, lookup, member, singleton, Map )
+import PlutusTx.Maybe                 ( Maybe(Nothing), isJust, maybe )
+import PlutusTx.Eq                    ( Eq(..) )
+import           PlutusTx.Prelude     (Bool (..),BuiltinByteString,($),(&&),Integer, error,
+                                      otherwise, (<>),(<$>),find,foldr,
+                                      map,elem, traceIfFalse, negate)
 import           Utilities            (wrapPolicy, writeCodeToFile,writePolicyToFile,currencySymbol,
                                       writeValidatorToFile, wrapValidator)
 import           Prelude              (IO)
@@ -48,6 +52,7 @@ makeIsDataIndexed ''Parameters [('Parameters,0)]
 
 -- | Under this minting policy, a participant can either mint or burn the NFT.
 -- | Minting requires a Merkle membership proof.
+-- | Burning requires the public key hash associated with the token.
 data Redeemer = Mint MT.Proof | Burn BuiltinByteString
 -- Ensure Plutus data is indexed properly for the 'Redeemer' type.
 makeIsDataIndexed ''Redeemer [('Mint,0),('Burn,1)]
@@ -57,8 +62,7 @@ makeIsDataIndexed ''Redeemer [('Mint,0),('Burn,1)]
 mkNFTPolicy :: Parameters -> Redeemer -> ScriptContext -> Bool
 mkNFTPolicy params red ctx = case red of
     Mint proof  -> foldr (&&) checkValues [checkDatumAddr, checkMember proof,checkRefValue, txSignedBy txInfo (PubKeyHash pkh)] -- Minting is possible if all these conditions are met.
-    Burn pkh'   -> traceIfFalse "test111" $ ownPolMint == insert (TokenName (prefixNFT params <> pkh')) (-1) (singleton (TokenName (prefixRef params <> pkh')) (-1)) -- burning can only happen is you burn both reference and NFT token
- --   Burn _pkh   -> True
+    Burn pkh'   -> ownPolMint == insert (TokenName (prefixNFT params <> pkh')) (-1) (singleton (TokenName (prefixRef params <> pkh')) (-1)) -- burning can only happen is you burn both reference and NFT token
     where
         -- Checks that the thread token is burned and one reference and one user NFT are minted.
         checkValues :: Bool
@@ -79,7 +83,7 @@ mkNFTPolicy params red ctx = case red of
         checkRefValue = singleton ownCur (singleton (TokenName (prefixRef params <> pkh)) 1) == delete adaSymbol (getValue (txOutValue refUtxo))
 
         -- Rest of the code are variable initializations and auxiliary function definitions to support the checks above.
-        
+
         -- `txInfo` is the transaction information of the current transaction context.
         txInfo :: TxInfo
         txInfo = scriptContextTxInfo ctx
@@ -144,7 +148,7 @@ mkFree _red _ctx = True
 
 {-# INLINABLE  mkWrappedFree #-}
 mkWrappedFree :: BuiltinData -> BuiltinData -> ()
-mkWrappedFree = wrapPolicy $ mkFree
+mkWrappedFree = wrapPolicy mkFree
 
 freePolicy :: MintingPolicy
 freePolicy = mkMintingPolicyScript $$(compile [|| mkWrappedFree ||])
@@ -155,15 +159,39 @@ saveFreePolicy = writePolicyToFile "assets/alwaysTrue.plutus" freePolicy
 freeCurrencySymbol :: CurrencySymbol
 freeCurrencySymbol = currencySymbol freePolicy
 
+instance (Eq a, Eq b, Eq c) => Eq (a, b,c) where
+    {-# INLINABLE (==) #-}
+    (a, b, c) == (a', b',c') = a == a' && b == b' && c==c'
+
 --------------------- The always fail validator -------------
 -- | TO DO: create a locking script that allows to spend, if above m at script is burned
 {-# INLINABLE  mkAlwaysFail #-}
 mkAlwaysFail :: BuiltinData -> () -> ScriptContext -> Bool
-mkAlwaysFail _dat _red ctx = traceIfFalse "falseTest" True
+mkAlwaysFail _dat _red ctx = traceIfFalse "test" $ foldr (&&) True $ map (\(x,y,z) -> elem (x,y, negate z) (flattenValue mintedVal)) (flattenValue ownValue)
+    where
+        -- `txInfo` is the transaction information of the current transaction context.
+        txInfo :: TxInfo
+        txInfo = scriptContextTxInfo ctx
+
+        mintedVal :: Value
+        mintedVal = txInfoMint txInfo
+
+        ownAddress :: Address
+        ownAddress = Address {addressCredential = ScriptCredential (ownHash ctx), addressStakingCredential = Nothing}
+
+        refUtxo :: TxOut
+        refUtxo = maybe (error ()) txInInfoResolved (find myfilter (txInfoInputs txInfo))
+            where
+                myfilter :: TxInInfo -> Bool
+                myfilter TxInInfo{txInInfoResolved} = ownAddress == txOutAddress txInInfoResolved
+
+        ownValue :: Value
+        ownValue = Value {getValue = delete adaSymbol (getValue (txOutValue refUtxo))}
+
 
 {-# INLINABLE  mkWrappedAlwaysFail #-}
 mkWrappedAlwaysFail :: BuiltinData -> BuiltinData -> BuiltinData -> ()
-mkWrappedAlwaysFail = wrapValidator $ mkAlwaysFail
+mkWrappedAlwaysFail = wrapValidator mkAlwaysFail
 
 alwaysFail :: Validator
 alwaysFail = mkValidatorScript $$(compile [|| mkWrappedAlwaysFail ||])
