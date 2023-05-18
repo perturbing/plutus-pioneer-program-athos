@@ -16,78 +16,90 @@ import           Plutus.V2.Ledger.Api (BuiltinData, PubKeyHash, ScriptContext,Cu
                                        Validator, Address, ScriptContext (..), TxInfo (..),
                                        TxInInfo (..), TokenName (..), Value (..),TxOut,txOutValue,
                                        txOutAddress,txOutDatum,OutputDatum (..), DatumHash (..), TxOut (..),
-                                       Datum (..))
-import           Plutus.V2.Ledger.Contexts (ownCurrencySymbol, findDatum)
+                                       Datum (..),PubKeyHash (..))
+import           Plutus.V2.Ledger.Contexts (ownCurrencySymbol, findDatum,txSignedBy)
 import           PlutusTx             (compile, makeIsDataIndexed, CompiledCode, unsafeFromBuiltinData)
 import           PlutusTx.AssocMap
 import           PlutusTx.Maybe
-import           PlutusTx.Prelude     (Bool (..),BuiltinByteString,(==),($),length,foldr,(&&),Integer, error,
-                                      otherwise, (<>),traceIfFalse,(<$>),find, (.),appendByteString,
-                                      decodeUtf8, BuiltinString)
+import           PlutusTx.Prelude     (Bool (..),BuiltinByteString,(==),($),(&&),Integer, error,
+                                      otherwise, (<>),(<$>),find)
 import           Utilities            (wrapPolicy, writeCodeToFile,writePolicyToFile,currencySymbol,
                                       writeValidatorToFile, wrapValidator)
 import           Prelude              (IO)
 import qualified Plutus.MerkleTree    as MT
-import Data.Char (GeneralCategory(CurrencySymbol))
 
 ---------------------------------------------------------------------------------------------------
 ----------------------------------- ON-CHAIN / MINTING-VALIDATOR ----------------------------------
+--  This minting policy allows for minting of a unique NFT (Non-Fungible Token) upon burning of the thread token,
+--  along with a merkle proof of the datum. The 'mkNFTPolicy' function below holds the core logic of this policy.
 
--- | The minting policy that upon burning of the thread token + a merkle proof of the datum, mints the PPP NFT.
 
+-- | 'Parameters' data type holds all the necessary information needed for setting up the minting policy.
 data Parameters = Parameters {
-      merkleRoot        :: MT.Hash             -- the merkle root of the NFT metadata (member = pubkeyhash <> datumHash) (the tkn is a section of pubkey)
-    , prefixNFT         :: BuiltinByteString   -- the (222) nft prefix 
-    , prefixRef         :: BuiltinByteString   -- the (100) ref prefix 
-    , threadSymbol      :: CurrencySymbol      -- the currency symbol of the thread token
-    , lockAddress       :: Address             -- the address to lock the reference NFT at
+      merkleRoot        :: MT.Hash             -- the Merkle root of the NFT metadata. a member is the concatenation of public key hash the datum hash.
+    , prefixNFT         :: BuiltinByteString   -- the prefix (222) for NFT. This is a 4-byte identifier that denotes the token is meant to be a NFT.
+    , prefixRef         :: BuiltinByteString   -- the prefix (100) for references. This is a 4-byte identifier that denotes the token is meant to be a reference token.
+    , threadSymbol      :: CurrencySymbol      -- the currency symbol of the thread token, note that the token name holds the public key hash of the participant.
+    , lockAddress       :: Address             -- the predetermined address to lock the reference NFT at.
 }
+
+-- Ensure Plutus data indexing is fixed properly for the 'Parameters' type.
 makeIsDataIndexed ''Parameters [('Parameters,0)]
 
+-- | Under this minting policy, a participant can either mint or burn the NFT.
+-- | Minting requires a Merkle membership proof.
 data Redeemer = Mint MT.Proof | Burn
+-- Ensure Plutus data is indexed properly for the 'Redeemer' type.
 makeIsDataIndexed ''Redeemer [('Mint,0),('Burn,1)]
 
+-- | The core minting policy of the Certificate.
 {-# INLINABLE mkNFTPolicy #-}
 mkNFTPolicy :: Parameters -> Redeemer -> ScriptContext -> Bool
 mkNFTPolicy params red ctx = case red of
-    Mint proof  -> checkValues && checkDatumAddr && checkMember proof
-    Burn        -> True
+    Mint proof  -> checkValues && checkDatumAddr && checkMember proof && txSignedBy txInfo (PubKeyHash pkh) -- Minting is possible if all these conditions are met.
+    Burn        -> True -- Currently burning is always possible, this will change to check that both the (222) and (100) token are burned together.
     where
-        -- checks that the thread token is burned and one ref and one user NFT are minted
+        -- Checks that the thread token is burned and one reference and one user NFT are minted.
         checkValues :: Bool
         checkValues = ownPolMint == insert (TokenName (prefixNFT params <> pkh)) 1 (singleton (TokenName (prefixRef params <> pkh)) 1) &&
                       maybe False (\x -> x== -1) (lookup (TokenName pkh) threadPolMint)
 
-        -- checks that the reference token is send to the predetermined locking address
+        -- Checks that the reference token is sent to the predetermined locking address.
         checkDatumAddr :: Bool
         checkDatumAddr = lockAddress params == txOutAddress refUtxo
 
+        -- Checks that the datum and public key hash are a member of the Merkle tree, confirming valid participant.
         checkMember :: MT.Proof -> Bool
         checkMember proof = MT.member (pkh <> refDatumHash) (merkleRoot params) proof
 
-        -- initialize some values that we will use --
+        -- Rest of the code are variable initializations and auxiliary function definitions to support the checks above.
+        
+        -- `txInfo` is the transaction information of the current transaction context.
         txInfo :: TxInfo
         txInfo = scriptContextTxInfo ctx
 
-        -- the currency symbol of this minting script
+        -- `ownCur` is the currency symbol of this minting script.
         ownCur :: CurrencySymbol
         ownCur = ownCurrencySymbol ctx
 
-        -- get the values of the thread token policy and the policy of this minting script from the mint value in the context
+        -- `splitValue` is called on the mint value in the transaction context to get values of the thread token policy and this minting script's policy.
         (threadPolMint,res1) = splitValue (threadSymbol params) (txInfoMint txInfo)
         (ownPolMint,_) = splitValue ownCur res1
 
-        -- extract the pkh of of the participant from the tokenname of the thread token (this also checks that only one token is burned under this thread policy)
+        -- `pkh` is the public key hash of the participant, which is extracted from the token name of the thread token.
+        -- This step also validates that only one token is burned under this thread policy.
         pkh :: BuiltinByteString
         pkh = (\(x:xs)-> if xs == [] then unTokenName x else error ()) (keys threadPolMint)
 
-        -- the TxOut that contains the ref NFT
+        -- `refUtxo` is the transaction output that contains the reference NFT.
         refUtxo :: TxOut
-        refUtxo = maybe (error ()) (\x -> x) (find filter (txInfoOutputs txInfo))
+        refUtxo = maybe (error ()) (\x -> x) (find myfilter (txInfoOutputs txInfo))
             where
-                filter :: TxOut -> Bool
-                filter output = maybe False (\x -> x) $ member (TokenName (prefixRef params <> pkh)) <$> lookup ownCur (getValue (txOutValue output))
+                myfilter :: TxOut -> Bool
+                myfilter output = maybe False (\x -> x) $ member (TokenName (prefixRef params <> pkh)) <$> lookup ownCur (getValue (txOutValue output))
 
+        -- `refDatumHash` is the datum hash of the reference transaction output.
+        -- Even though it's not an inline datum, the full datum is validated to be attached in the witness set.
         refDatumHash :: BuiltinByteString
         refDatumHash = fetchDatum refUtxo
             where
@@ -95,10 +107,11 @@ mkNFTPolicy params red ctx = case red of
                 fetchDatum TxOut{txOutDatum} = case txOutDatum of
                     NoOutputDatum                   -> error ()
                     OutputDatumHash (DatumHash h)   -> if isJust (findDatum (DatumHash h) txInfo) then h else error ()
-                    OutputDatum d                   -> error ()
+                    OutputDatum _                   -> error ()
 
 {-# INLINABLE splitValue #-}
--- A function that given a value and a currency symbol, returns the total value under that currency symbol and the residual value in a tuple.
+-- `splitValue` is a utility function that takes a currency symbol and a value, 
+-- and returns a tuple of total value under the provided currency symbol and the residual value.
 splitValue :: CurrencySymbol -> Value -> (Map TokenName Integer, Value)
 splitValue symbol val
     | member symbol val'  = (maybe empty (\x -> x) (lookup symbol val'), Value (delete symbol val'))
@@ -115,26 +128,7 @@ nftCode :: CompiledCode (BuiltinData -> BuiltinData -> BuiltinData -> () )
 nftCode = $$(compile [|| mkNFTWrapped ||])
 
 saveNFTPolicy :: IO ()
-saveNFTPolicy = writeCodeToFile "Mint/assets/nft.plutus" nftCode
-
----------------------- A testing policy for membership proofs using merkle tree -------------------
-
-{-# INLINABLE mkPolicy #-}
-mkPolicy :: MT.Hash -> (BuiltinByteString, MT.Proof) -> ScriptContext -> Bool
-mkPolicy root (mem, proof) _ctx = MT.member mem root proof
-
-{-# INLINABLE  mkWrappedPolicy #-}
-mkWrappedPolicy :: BuiltinData -> BuiltinData -> BuiltinData -> ()
-mkWrappedPolicy root = wrapPolicy $ mkPolicy root'
-    where
-        root' = unsafeFromBuiltinData root
-
-policyCode :: CompiledCode (BuiltinData -> BuiltinData -> BuiltinData -> () )
-policyCode = $$(compile [|| mkWrappedPolicy ||])
-
-savePolicy :: IO ()
-savePolicy = writeCodeToFile "Mint/assets/policy.plutus" policyCode
-
+saveNFTPolicy = writeCodeToFile "assets/certificate-policy.plutus" nftCode
 
 ---------------------- The never fail minting policy ------------
 
@@ -150,12 +144,13 @@ freePolicy :: MintingPolicy
 freePolicy = mkMintingPolicyScript $$(compile [|| mkWrappedFree ||])
 
 saveFreePolicy :: IO ()
-saveFreePolicy = writePolicyToFile "Mint/assets/free.plutus" freePolicy
+saveFreePolicy = writePolicyToFile "assets/alwaysTrue.plutus" freePolicy
 
 freeCurrencySymbol :: CurrencySymbol
 freeCurrencySymbol = currencySymbol freePolicy
 
 --------------------- The always fail validator -------------
+-- | TO DO: create a locking script that allows to spend, if above m at script is burned
 {-# INLINABLE  mkAlwaysFail #-}
 mkAlwaysFail :: () -> () -> ScriptContext -> Bool
 mkAlwaysFail _dat _red _ctx = False
@@ -168,4 +163,4 @@ alwaysFail :: Validator
 alwaysFail = mkValidatorScript $$(compile [|| mkWrappedAlwaysFail ||])
 
 saveAlwaysFail :: IO ()
-saveAlwaysFail = writeValidatorToFile "Mint/assets/AlwaysFail.plutus" alwaysFail
+saveAlwaysFail = writeValidatorToFile "assets/alwaysFalse.plutus" alwaysFail

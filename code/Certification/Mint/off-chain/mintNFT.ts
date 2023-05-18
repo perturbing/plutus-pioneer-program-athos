@@ -29,7 +29,7 @@ const addr: L.Address = await lucid.wallet.address();
 const pkh: string = L.getAddressDetails(addr).paymentCredential.hash;
 
 async function readScript(name: string): Promise<L.MintingPolicy> {
-    const validator = JSON.parse(await Deno.readTextFile("Mint/assets/"+ name))
+    const validator = JSON.parse(await Deno.readTextFile("assets/"+ name))
     return {
       type: "PlutusV2",
       script: validator.cborHex
@@ -37,11 +37,11 @@ async function readScript(name: string): Promise<L.MintingPolicy> {
 }
 
 // import always true minting policy (replace for threadtoken policy)
-const mintingScriptFree: L.MintingPolicy = await readScript("free.plutus");
+const mintingScriptFree: L.MintingPolicy = await readScript("alwaysTrue.plutus");
 const policyIdFree: L.PolicyId = lucid.utils.mintingPolicyToId(mintingScriptFree);
 
 // import always fail validator (this locks the reference token)
-const validatorAlwaysFail: L.SpendingValidator = await readScript("AlwaysFail.plutus");
+const validatorAlwaysFail: L.SpendingValidator = await readScript("alwaysFalse.plutus");
 const addressAlwaysFail: L.Address = lucid.utils.validatorToAddress(validatorAlwaysFail);
 const details: L.AddressDetails = L.getAddressDetails(addressAlwaysFail);
 
@@ -82,7 +82,7 @@ const parameters: Types.Parameters = {
 const Params = L.Data.Tuple([Types.Parameters]);
 type Params = L.Data.Static<typeof Params>;
 async function readNFTPolicy(): Promise<L.MintingPolicy> {
-  const script = JSON.parse(await Deno.readTextFile("Mint/assets/nft.plutus"))
+  const script = JSON.parse(await Deno.readTextFile("assets/certificate-policy.plutus"))
   return {
     type: "PlutusV2",
     script: L.applyParamsToScript<Params>(script.cborHex,[parameters],Params)
@@ -121,6 +121,7 @@ async function mint(): Promise<L.TxHash> {
       .mintAssets({ [threadTkn]:-1n }, L.Data.void())
       .attachMintingPolicy(mintingScriptFree)
       .payToContract(addressAlwaysFail, L.Data.to(new L.Constr(0,[metadataDatum])),{[refTkn]: 1n})
+      .addSignerKey(pkh)
       .complete();
     const signedTx = await tx.sign().complete();
    
