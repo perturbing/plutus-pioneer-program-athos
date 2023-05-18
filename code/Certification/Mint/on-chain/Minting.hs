@@ -16,13 +16,13 @@ import           Plutus.V2.Ledger.Api (BuiltinData, PubKeyHash, ScriptContext,Cu
                                        Validator, Address, ScriptContext (..), TxInfo (..),
                                        TxInInfo (..), TokenName (..), Value (..),TxOut,txOutValue,
                                        txOutAddress,txOutDatum,OutputDatum (..), DatumHash (..), TxOut (..),
-                                       Datum (..),PubKeyHash (..))
+                                       Datum (..),PubKeyHash (..),adaSymbol)
 import           Plutus.V2.Ledger.Contexts (ownCurrencySymbol, findDatum,txSignedBy)
 import           PlutusTx             (compile, makeIsDataIndexed, CompiledCode, unsafeFromBuiltinData)
 import           PlutusTx.AssocMap
 import           PlutusTx.Maybe
 import           PlutusTx.Prelude     (Bool (..),BuiltinByteString,(==),($),(&&),Integer, error,
-                                      otherwise, (<>),(<$>),find)
+                                      otherwise, (<>),(<$>),find,foldr,traceIfFalse,(>),length)
 import           Utilities            (wrapPolicy, writeCodeToFile,writePolicyToFile,currencySymbol,
                                       writeValidatorToFile, wrapValidator)
 import           Prelude              (IO)
@@ -48,7 +48,7 @@ makeIsDataIndexed ''Parameters [('Parameters,0)]
 
 -- | Under this minting policy, a participant can either mint or burn the NFT.
 -- | Minting requires a Merkle membership proof.
-data Redeemer = Mint MT.Proof | Burn
+data Redeemer = Mint MT.Proof | Burn BuiltinByteString
 -- Ensure Plutus data is indexed properly for the 'Redeemer' type.
 makeIsDataIndexed ''Redeemer [('Mint,0),('Burn,1)]
 
@@ -56,8 +56,9 @@ makeIsDataIndexed ''Redeemer [('Mint,0),('Burn,1)]
 {-# INLINABLE mkNFTPolicy #-}
 mkNFTPolicy :: Parameters -> Redeemer -> ScriptContext -> Bool
 mkNFTPolicy params red ctx = case red of
-    Mint proof  -> checkValues && checkDatumAddr && checkMember proof && txSignedBy txInfo (PubKeyHash pkh) -- Minting is possible if all these conditions are met.
-    Burn        -> True -- Currently burning is always possible, this will change to check that both the (222) and (100) token are burned together.
+    Mint proof  -> foldr (&&) checkValues [checkDatumAddr, checkMember proof,checkRefValue, txSignedBy txInfo (PubKeyHash pkh)] -- Minting is possible if all these conditions are met.
+    Burn pkh'   -> traceIfFalse "test111" $ ownPolMint == insert (TokenName (prefixNFT params <> pkh')) (-1) (singleton (TokenName (prefixRef params <> pkh')) (-1)) -- burning can only happen is you burn both reference and NFT token
+ --   Burn _pkh   -> True
     where
         -- Checks that the thread token is burned and one reference and one user NFT are minted.
         checkValues :: Bool
@@ -71,6 +72,11 @@ mkNFTPolicy params red ctx = case red of
         -- Checks that the datum and public key hash are a member of the Merkle tree, confirming valid participant.
         checkMember :: MT.Proof -> Bool
         checkMember proof = MT.member (pkh <> refDatumHash) (merkleRoot params) proof
+
+        -- Checks that the value send to the lock adress only contains the reference token.
+        -- This is needed since the lock script at this address only unlocks if all value is burned
+        checkRefValue :: Bool
+        checkRefValue = singleton ownCur (singleton (TokenName (prefixRef params <> pkh)) 1) == delete adaSymbol (getValue (txOutValue refUtxo))
 
         -- Rest of the code are variable initializations and auxiliary function definitions to support the checks above.
         
@@ -115,7 +121,7 @@ mkNFTPolicy params red ctx = case red of
 splitValue :: CurrencySymbol -> Value -> (Map TokenName Integer, Value)
 splitValue symbol val
     | member symbol val'  = (maybe empty (\x -> x) (lookup symbol val'), Value (delete symbol val'))
-    | otherwise           = error ()
+    | otherwise           = (empty,val)
     where val' = getValue val
 
 {-# INLINABLE  mkNFTWrapped #-}
@@ -152,8 +158,8 @@ freeCurrencySymbol = currencySymbol freePolicy
 --------------------- The always fail validator -------------
 -- | TO DO: create a locking script that allows to spend, if above m at script is burned
 {-# INLINABLE  mkAlwaysFail #-}
-mkAlwaysFail :: () -> () -> ScriptContext -> Bool
-mkAlwaysFail _dat _red _ctx = False
+mkAlwaysFail :: BuiltinData -> () -> ScriptContext -> Bool
+mkAlwaysFail _dat _red ctx = traceIfFalse "falseTest" True
 
 {-# INLINABLE  mkWrappedAlwaysFail #-}
 mkWrappedAlwaysFail :: BuiltinData -> BuiltinData -> BuiltinData -> ()

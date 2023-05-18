@@ -109,41 +109,23 @@ async function readNFTPolicy(): Promise<L.MintingPolicy> {
 }
 const mintingScriptNFT: L.MintingPolicy = await readNFTPolicy();
 const policyIdNFT: L.PolicyId = lucid.utils.mintingPolicyToId(mintingScriptNFT);
-console.log("PolicyID: "+policyIdNFT)
 
-async function mintPKHToken(): Promise<L.TxHash> {
-  const tkn: L.Unit = L.toUnit(policyIdFree,pkh);
-  const tx = await lucid
-    .newTx()
-    .mintAssets({ [tkn]: 1n}, L.Data.void())
-    .attachMintingPolicy(mintingScriptFree)
-    .complete();
-  const signedTx = await tx.sign().complete();
- 
-  return signedTx.submit();
-}
-//console.log(await mintPKHToken());
-
-const Redeemer = L.Data.Object({proof: Types.MerkleProof})
-type Redeemer = L.Data.Static<typeof Redeemer>
-
-const redeemer: Redeemer = {proof: merkleProof1}
-
-async function mint(): Promise<L.TxHash> {
-    const threadTkn: L.Unit = L.toUnit(policyIdFree,pkh);
+async function burn(): Promise<L.TxHash> {
+    const dtm: L.Datum = L.Data.to(new L.Constr(0,[L.Data.fromJson(genImageParticipant(particpantsName))]))
+    const dtmHash = await blake2bHash(dtm)
+    const utxoAtScript: L.UTxO[] = await lucid.utxosAt(addressAlwaysFail);
+    const ourUTxO: L.UTxO[] = utxoAtScript.filter((utxo) => utxo.datumHash == dtmHash);
     const userTkn: L.Unit = L.toUnit(policyIdNFT,pkh,222);
     const refTkn: L.Unit = L.toUnit(policyIdNFT,pkh,100)
     const tx = await lucid
       .newTx()
-      .mintAssets({ [userTkn]: 1n, [refTkn]: 1n},  L.Data.to<Redeemer>(redeemer,Redeemer))
+      .collectFrom([ourUTxO[2]], L.Data.void())
+      .attachSpendingValidator(validatorAlwaysFail)
+      .mintAssets({ [userTkn]: -1n, [refTkn]: -1n},  L.Data.to(new L.Constr(1,[pkh])))
       .attachMintingPolicy(mintingScriptNFT)
-      .mintAssets({ [threadTkn]:-1n }, L.Data.void())
-      .attachMintingPolicy(mintingScriptFree)
-      .payToContract(addressAlwaysFail, L.Data.to(new L.Constr(0,[L.Data.fromJson(genImageParticipant(particpantsName))])),{[refTkn]: 1n})
-      .addSignerKey(pkh)
       .complete();
     const signedTx = await tx.sign().complete();
    
     return signedTx.submit();
 }
-console.log(await mint())
+console.log(await burn())
