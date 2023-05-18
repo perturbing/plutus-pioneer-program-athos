@@ -1,7 +1,7 @@
 import * as L from "https://deno.land/x/lucid@0.10.1/mod.ts";
 import * as Types from "./types.ts"
 import { secretSeed } from "./seed.ts";
-import metadata from "../../Data/generic_metadata.json" assert { type: "json" };
+import genericMetadata from "../../Data/generic_metadata.json" assert { type: "json" };
 import merkleData from "../../Data/merkleData.ts";
 import * as mod from "https://deno.land/std@0.182.0/crypto/mod.ts";
 import {decode} from "https://deno.land/std/encoding/hex.ts";
@@ -27,8 +27,12 @@ const lucid = await L.Lucid.new(
 
 lucid.selectWalletFromSeed(secretSeed);
 const addr: L.Address = await lucid.wallet.address();
+
+// define here your name and public key hash
+const particpantsName: string = "Thomas"
 const pkh: string = L.getAddressDetails(addr).paymentCredential.hash;
 
+// a helper function that reads an unparametrized plutus script
 async function readScript(name: string): Promise<L.MintingPolicy> {
     const validator = JSON.parse(await Deno.readTextFile("assets/"+ name))
     return {
@@ -46,26 +50,39 @@ const validatorAlwaysFail: L.SpendingValidator = await readScript("alwaysFalse.p
 const addressAlwaysFail: L.Address = lucid.utils.validatorToAddress(validatorAlwaysFail);
 const details: L.AddressDetails = L.getAddressDetails(addressAlwaysFail);
 
-// nft datum stuff
-const metadataDatum = L.Data.fromJson(metadata);
-const datumPlutusData = L.Data.to(new L.Constr(0,[metadataDatum]))
-const datumHash = await blake2bHash(datumPlutusData)
+// generate NFT metadatum for participant
+
+// create personalised metadata
+function genImageParticipant(name:string) {
+  return {
+      name: genericMetadata.name+name,
+      image: genericMetadata.image,
+      description: genericMetadata.description
+  }
+}
+
+async function participantNumberToMerkleData(name:string,pubkeyhash:string): Promise<string> {
+  const plutusMetaData = L.Data.fromJson(genImageParticipant(name));
+  const datumHash = await blake2bHash(L.Data.to(new L.Constr(0,[plutusMetaData])));
+  return pubkeyhash+datumHash;
+}
+// nft datum
+const metadataDatum = await participantNumberToMerkleData(particpantsName,pkh);
 
 // merkle tree stuff
-const data = [pkh + datumHash,pkh + datumHash];
-const dataUint = data.map( (a) => L.fromHex(a));
+const dataUint = merkleData.map((x) => L.fromHex(x));
 const merkleTree = new L.MerkleTree(dataUint);
 const merkleRoot: Types.Hash = { hash: L.toHex(merkleTree.rootHash())};
 
 // a test member and proof
-const n = 1;
-const member = L.fromText(data[n])
+// retrieve the index of the user in the list of merkle tree data.
+const n = merkleData.indexOf(metadataDatum)
+// the following function will fail if n is -1 (the provided pkh and name are not in the merkletree)
 const merkleProof1 : Types.MerkleProof = merkleTree.getProof(dataUint[n]).map((p) =>
   p.left
     ? { Left: [{ hash: L.toHex(p.left) }] }
     : { Right: [{ hash: L.toHex(p.right!) }] }
 )
-console.log(data[n])
 
 // setup parameters
 const prefixNFT: Types.Prefix = L.toLabel(222);
@@ -122,7 +139,7 @@ async function mint(): Promise<L.TxHash> {
       .attachMintingPolicy(mintingScriptNFT)
       .mintAssets({ [threadTkn]:-1n }, L.Data.void())
       .attachMintingPolicy(mintingScriptFree)
-      .payToContract(addressAlwaysFail, L.Data.to(new L.Constr(0,[metadataDatum])),{[refTkn]: 1n})
+      .payToContract(addressAlwaysFail, L.Data.to(new L.Constr(0,[L.Data.fromJson(genImageParticipant(particpantsName))])),{[refTkn]: 1n})
       .addSignerKey(pkh)
       .complete();
     const signedTx = await tx.sign().complete();
