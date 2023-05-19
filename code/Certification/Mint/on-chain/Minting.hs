@@ -31,8 +31,12 @@ import           Utilities            (wrapPolicy, writeCodeToFile,writePolicyTo
 import           Prelude              (IO)
 import qualified Plutus.MerkleTree    as MT
 
+-- [General notes on this file]
+-- This file contains two plutus scripts, the minting logic of the PPP NFT and the logic of the validator that locks the 
+-- reference token of this NFT (See CIP 68 for more info on this reference token).
+
 ---------------------------------------------------------------------------------------------------
------------------------------------ ON-CHAIN / MINTING-VALIDATOR ----------------------------------
+----------------------------------- MINTING-VALIDATOR ---------------------------------------------
 --  This minting policy allows for minting of a unique NFT (Non-Fungible Token) upon burning of the thread token,
 --  along with a merkle proof of the datum. The 'mkNFTPolicy' function below holds the core logic of this policy.
 
@@ -78,6 +82,7 @@ mkNFTPolicy params red ctx = case red of
 
         -- Checks that the value send to the lock adress only contains the reference token.
         -- This is needed since the lock script at this address only unlocks if all value is burned
+        -- So it cannot contain any tokens of which their policy logic is unknown.
         checkRefValue :: Bool
         checkRefValue = singleton ownCur (singleton (TokenName (prefixRef params <> pkh)) 1) == delete adaSymbol (getValue (txOutValue refUtxo))
 
@@ -119,8 +124,8 @@ mkNFTPolicy params red ctx = case red of
                     OutputDatum _                   -> error ()
 
 {-# INLINABLE splitValue #-}
--- `splitValue` is a utility function that takes a currency symbol and a value, 
--- and returns a tuple of total value under the provided currency symbol and the residual value.
+-- | `splitValue` is a utility function that takes a currency symbol and a value, 
+-- | and returns a tuple of total value under the provided currency symbol and the residual value.
 splitValue :: CurrencySymbol -> Value -> (Map TokenName Integer, Value)
 splitValue symbol val
     | member symbol val'  = (maybe empty (\x -> x) (lookup symbol val'), Value (delete symbol val'))
@@ -139,7 +144,10 @@ nftCode = $$(compile [|| mkNFTWrapped ||])
 saveNFTPolicy :: IO ()
 saveNFTPolicy = writeCodeToFile "assets/certificate-policy.plutus" nftCode
 
----------------------- The never fail minting policy ------------
+---------------------- The never fail minting policy ----------------------
+-- Since the thread minting policy is not written yet, and we do want to test out the above script
+-- the always true minting policy is currently used as a standin for the soon to follow real thread policy.
+-- TO DO: Remove this once the "Start" exam functionality is done.
 
 {-# INLINABLE  mkFree #-}
 mkFree :: () -> ScriptContext -> Bool
@@ -159,12 +167,20 @@ freeCurrencySymbol :: CurrencySymbol
 freeCurrencySymbol = currencySymbol freePolicy
 
 
---------------------- The always fail validator -------------
--- create a Eq instance for a triple (a,b,c)
+--------------------- The locing validator -------------
+-- This section details the logic for the locking validator. This mechanism holds the reference token of the PPP NFT as described in CIP 68.
+-- The purpose of this validator is twofold: to mint the PPP NFT and to provide an option for participants to burn them.
+-- A key condition for burning is that both the reference token and the NFT should be burned together, as per the minting policy described above.
+-- However, before the burning of the reference token can occur, it must first be released from the locking validator.
+-- As the minting policy references the locking address in its parameters, we cannot directly refer to the minting policy from within the locking validator.
+-- Hence, this validator is designed such that it verifies it can expend its output only when all value at its output (except Ada) is set to be burned.
+
+-- Creating an Eq instance for a triple (a,b,c) for equivalence comparison.
 instance (Eq a, Eq b, Eq c) => Eq (a, b, c) where
     {-# INLINABLE (==) #-}
     (a, b, c) == (a', b', c') = a == a' && b == b' && c == c'
 
+-- | The locking validator that locks the reference metadata of the Certificate.
 {-# INLINABLE  mkLockingScript #-}
 mkLockingScript :: BuiltinData -> () -> ScriptContext -> Bool
 mkLockingScript _dat _red ctx = foldr (&&) True $ map (\(x,y,z) -> elem (x,y, negate z) (flattenValue mintedVal)) (flattenValue ownValue)
@@ -173,18 +189,23 @@ mkLockingScript _dat _red ctx = foldr (&&) True $ map (\(x,y,z) -> elem (x,y, ne
         txInfo :: TxInfo
         txInfo = scriptContextTxInfo ctx
 
+        -- `mintedVal` represents the value being minted in this transaction.
         mintedVal :: Value
         mintedVal = txInfoMint txInfo
 
+        -- `ownAddress` represents the address owned by this script.
         ownAddress :: Address
         ownAddress = Address {addressCredential = ScriptCredential (ownHash ctx), addressStakingCredential = Nothing}
 
+        -- `refUtxo` fetches the transaction output that corresponds to `ownAddress`.
         refUtxo :: TxOut
         refUtxo = maybe (error ()) txInInfoResolved (find myfilter (txInfoInputs txInfo))
             where
+                -- `myfilter` is a helper function to filter for the transaction input info corresponding to `ownAddress`
                 myfilter :: TxInInfo -> Bool
                 myfilter TxInInfo{txInInfoResolved} = ownAddress == txOutAddress txInInfoResolved
 
+        -- `ownValue` is the value associated with `ownAddress`, excluding Ada.
         ownValue :: Value
         ownValue = Value {getValue = delete adaSymbol (getValue (txOutValue refUtxo))}
 
