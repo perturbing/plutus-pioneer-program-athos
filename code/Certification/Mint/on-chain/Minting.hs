@@ -16,7 +16,7 @@ import           Plutus.V2.Ledger.Api (BuiltinData, ScriptContext,CurrencySymbol
                                        Validator, Address (Address), ScriptContext (..), TxInfo (..),
                                        TxInInfo (..), TokenName (..), Value (..),TxOut,txOutValue,
                                        txOutAddress,txOutDatum,OutputDatum (..), DatumHash (..), TxOut (..),adaSymbol,Credential (..),addressCredential,
-                                       addressStakingCredential,PubKeyHash (..))
+                                       addressStakingCredential,PubKeyHash (..), ScriptPurpose (..), TxOutRef (TxOutRef))
 import           Plutus.V2.Ledger.Contexts (ownCurrencySymbol, findDatum,txSignedBy,ownHash)
 import           PlutusTx             (compile, makeIsDataIndexed, CompiledCode, unsafeFromBuiltinData)
 import Plutus.V1.Ledger.Value         (flattenValue)
@@ -193,19 +193,22 @@ mkLockingScript _dat _red ctx = foldr (&&) True $ map (\(x,y,z) -> elem (x,y, ne
         mintedVal :: Value
         mintedVal = txInfoMint txInfo
 
-        -- `ownAddress` represents the address owned by this script.
-        ownAddress :: Address
-        ownAddress = Address {addressCredential = ScriptCredential (ownHash ctx), addressStakingCredential = Nothing}
+        -- 'txOutRef' represents the transaction reference (Id + Index) of the output associated with the currently script being checked.
+        txOutRef = getRef ctx
+            where
+                getRef :: ScriptContext -> TxOutRef
+                getRef ScriptContext{scriptContextPurpose=Spending ref} = ref
+                getRef _ = error ()
 
-        -- `refUtxo` fetches the transaction output that corresponds to `ownAddress`.
+        -- `refUtxo` fetches the transaction output that corresponds to `txOutRef`.
         refUtxo :: TxOut
         refUtxo = maybe (error ()) txInInfoResolved (find myfilter (txInfoInputs txInfo))
             where
-                -- `myfilter` is a helper function to filter for the transaction input info corresponding to `ownAddress`
+                -- `myfilter` is a helper function to filter for the transaction input info corresponding to `txOutRef`
                 myfilter :: TxInInfo -> Bool
-                myfilter TxInInfo{txInInfoResolved} = ownAddress == txOutAddress txInInfoResolved
+                myfilter TxInInfo{txInInfoOutRef} = txOutRef == txInInfoOutRef
 
-        -- `ownValue` is the value associated with `ownAddress`, excluding Ada.
+        -- `ownValue` is the value associated with `txOutRef`, excluding Ada.
         ownValue :: Value
         ownValue = Value {getValue = delete adaSymbol (getValue (txOutValue refUtxo))}
 
