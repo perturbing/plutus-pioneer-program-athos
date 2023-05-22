@@ -1,5 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import * as blake2 from "blake2";
+import {
+    C,
+    fromHex,
+    toHex
+} from "lucid-cardano";
 
 type Data = {
     hash: string;
@@ -9,11 +13,8 @@ export default function handler(
     req: NextApiRequest,
     res: NextApiResponse<Data>
 ) {
-    // TODO: Check implementation
-    const bin = new TextEncoder().encode(req.body.datum);
-    const hashObj = blake2.createHash("blake2b").update(Buffer.from(bin));
-    const hash = hashObj.digest("hex");
-    // FIXME: This is a dummy implementation
+    const bin = fromHex(req.body.datum);
+    const hash = toHex(C.hash_blake2b256(bin));
 
     res.status(200).json({ hash: hash });
 }
