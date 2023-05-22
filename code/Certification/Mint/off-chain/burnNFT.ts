@@ -111,13 +111,13 @@ const mintingScriptNFT: L.MintingPolicy = await readNFTPolicy();
 const policyIdNFT: L.PolicyId = lucid.utils.mintingPolicyToId(mintingScriptNFT);
 
 async function burn(): Promise<L.TxHash> {
-    const dtm: L.Datum = L.Data.to(new L.Constr(0,[L.Data.fromJson(genImageParticipant(particpantsName))]))
-    const dtmHash = await blake2bHash(dtm)
-    const utxoAtScript: L.UTxO[] = await lucid.utxosAt(lockingAddress);
-    const ourUTxO: L.UTxO[] = utxoAtScript.filter((utxo) => utxo.datumHash == dtmHash);
     const userTkn: L.Unit = L.toUnit(policyIdNFT,pkh,222);
-    const refTkn: L.Unit = L.toUnit(policyIdNFT,pkh,100)
-    const tx = await lucid
+    const refTkn: L.Unit = L.toUnit(policyIdNFT,pkh,100);
+    const utxoAtScript: L.UTxO[] = await lucid.utxosAt(lockingAddress);
+    const ourUTxO: L.UTxO[] = utxoAtScript.filter((utxo) => utxo.assets[refTkn] == 1n);
+
+    if (ourUTxO && ourUTxO.length > 0) {
+      const tx = await lucid
       .newTx()
       .collectFrom(ourUTxO, L.Data.void())
       .attachSpendingValidator(lockingValidator)
@@ -127,5 +127,9 @@ async function burn(): Promise<L.TxHash> {
     const signedTx = await tx.sign().complete();
    
     return signedTx.submit();
+    }
+    else return "No UTxO's found that can be burned"
+
+
 }
 console.log(await burn())
