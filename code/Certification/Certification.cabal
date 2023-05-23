@@ -34,4 +34,6 @@ common common-all
 library
   import:               common-all
   hs-source-dirs:       Mint/on-chain
-  exposed-modules:      Minting
+                        Start/on-chain
+  exposed-modules:      Mint
+                        Start

@@ -9,24 +9,24 @@
 {-# HLINT ignore "Use id" #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
-module Minting where
+module Mint where
 
 import           Plutus.V2.Ledger.Api (BuiltinData, ScriptContext,CurrencySymbol,
                                        MintingPolicy, mkMintingPolicyScript, mkValidatorScript,
-                                       Validator, Address (Address), ScriptContext (..), TxInfo (..),
-                                       TxInInfo (..), TokenName (..), Value (..),TxOut,txOutValue,
-                                       txOutAddress,txOutDatum,OutputDatum (..), DatumHash (..), TxOut (..),adaSymbol,Credential (..),addressCredential,
-                                       addressStakingCredential,PubKeyHash (..), ScriptPurpose (..), TxOutRef (TxOutRef))
-import           Plutus.V2.Ledger.Contexts (ownCurrencySymbol, findDatum,txSignedBy,ownHash)
+                                       Validator, ScriptContext (..), TxInfo (..),
+                                       TxInInfo (..), TokenName (..), Value (..),TxOut ,txOutValue,
+                                       txOutAddress, txOutDatum, OutputDatum (..), DatumHash (..), TxOut (..),
+                                       adaSymbol, PubKeyHash (..), ScriptPurpose (..), Address, TxOutRef)
+import           Plutus.V2.Ledger.Contexts (ownCurrencySymbol, findDatum, txSignedBy)
 import           PlutusTx             (compile, makeIsDataIndexed, CompiledCode, unsafeFromBuiltinData)
 import Plutus.V1.Ledger.Value         (flattenValue)
-import PlutusTx.AssocMap              ( delete, empty, insert, keys, lookup, member, singleton, Map )
-import PlutusTx.Maybe                 ( Maybe(Nothing), isJust, maybe )
-import PlutusTx.Eq                    ( Eq(..) )
-import           PlutusTx.Prelude     (Bool (..),BuiltinByteString,($),(&&),Integer, error,
-                                      otherwise, (<>),(<$>),find,foldr,
-                                      map,elem, negate)
-import           Utilities            (wrapPolicy, writeCodeToFile,writePolicyToFile,currencySymbol,
+import PlutusTx.AssocMap              (delete, empty, insert, keys, lookup, member, singleton, Map )
+import PlutusTx.Maybe                 (isJust, maybe )
+import PlutusTx.Eq                    (Eq(..) )
+import           PlutusTx.Prelude     (Bool (..), BuiltinByteString, ($), (&&), Integer, error,
+                                      otherwise, (<>), (<$>), find, foldr,
+                                      map, elem, negate)
+import           Utilities            (wrapPolicy, writeCodeToFile,writePolicyToFile, currencySymbol,
                                       writeValidatorToFile, wrapValidator)
 import           Prelude              (IO)
 import qualified Plutus.MerkleTree    as MT
@@ -43,11 +43,20 @@ import qualified Plutus.MerkleTree    as MT
 
 -- | 'Parameters' data type holds all the necessary information needed for setting up the minting policy.
 data Parameters = Parameters {
-      merkleRoot        :: MT.Hash             -- the Merkle root of the NFT metadata. a member is the concatenation of public key hash the datum hash.
-    , prefixNFT         :: BuiltinByteString   -- the prefix (222) for NFT. This is a 4-byte identifier that denotes the token is meant to be a NFT.
-    , prefixRef         :: BuiltinByteString   -- the prefix (100) for references. This is a 4-byte identifier that denotes the token is meant to be a reference token.
-    , threadSymbol      :: CurrencySymbol      -- the currency symbol of the thread token, note that the token name holds the public key hash of the participant.
-    , lockAddress       :: Address             -- the predetermined address to lock the reference NFT at.
+                    -- | the Merkle root of the NFT metadata. a member is the concatenation of public key hash the datum hash.
+                    merkleRoot        :: MT.Hash
+    ,
+                    -- | the prefix (222) for NFT. This is a 4-byte identifier that denotes the token is meant to be a NFT.
+                    prefixNFT         :: BuiltinByteString
+    ,
+                    -- | the prefix (100) for references. This is a 4-byte identifier that denotes the token is meant to be a reference token.
+                    prefixRef         :: BuiltinByteString
+    ,
+                    -- | the currency symbol of the thread token, note that the token name holds the public key hash of the participant.
+                    threadSymbol      :: CurrencySymbol
+    ,
+                    -- | the predetermined address to lock the reference NFT at.
+                    lockAddress       :: Address
 }
 
 -- Ensure Plutus data indexing is fixed properly for the 'Parameters' type.
@@ -123,14 +132,6 @@ mkNFTPolicy params red ctx = case red of
                     OutputDatumHash (DatumHash h)   -> if isJust (findDatum (DatumHash h) txInfo) then h else error ()
                     OutputDatum _                   -> error ()
 
-{-# INLINABLE splitValue #-}
--- | `splitValue` is a utility function that takes a currency symbol and a value, 
--- | and returns a tuple of total value under the provided currency symbol and the residual value.
-splitValue :: CurrencySymbol -> Value -> (Map TokenName Integer, Value)
-splitValue symbol val
-    | member symbol val'  = (maybe empty (\x -> x) (lookup symbol val'), Value (delete symbol val'))
-    | otherwise           = (empty,val)
-    where val' = getValue val
 
 {-# INLINABLE  mkNFTWrapped #-}
 mkNFTWrapped :: BuiltinData -> BuiltinData -> BuiltinData -> ()
@@ -222,3 +223,14 @@ lockingValidator = mkValidatorScript $$(compile [|| mkWrappedLockingScript ||])
 
 saveLockingValidator :: IO ()
 saveLockingValidator = writeValidatorToFile "assets/lockingValidator.plutus" lockingValidator
+
+--------------------- helper functions -------------
+
+{-# INLINABLE splitValue #-}
+-- | `splitValue` is a utility function that takes a currency symbol and a value, 
+-- | and returns a tuple of total value under the provided currency symbol and the residual value.
+splitValue :: CurrencySymbol -> Value -> (Map TokenName Integer, Value)
+splitValue symbol val
+    | member symbol val'  = (maybe empty (\x -> x) (lookup symbol val'), Value (delete symbol val'))
+    | otherwise           = (empty,val)
+    where val' = getValue val
