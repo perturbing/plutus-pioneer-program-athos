@@ -26,6 +26,7 @@ const lucid = await L.Lucid.new(
 lucid.selectWalletFromSeed(secretSeed);
 const addr: L.Address = await lucid.wallet.address();
 
+
 // define here your name and public key hash
 const pkh: string = L.getAddressDetails(addr).paymentCredential.hash;
 const participantNumber: number = 1;
@@ -44,6 +45,12 @@ async function readScript(name: string): Promise<L.MintingPolicy> {
     script: validator.cborHex
   }
 }
+
+const lockingValidator: L.SpendingValidator = await readScript("lockingValidator.plutus");
+const lockingAddress: L.Address = lucid.utils.validatorToAddress(lockingValidator);
+const lockingAddressDetails: L.AddressDetails = L.getAddressDetails(lockingAddress);
+const lockingAddressScriptHash = lockingAddressDetails.paymentCredential.hash;
+const lockingAddressDatumHash = await blake2bHash(L.Data.to(new L.Constr(0,[])))
 
 
 // import always true minting policy (replace for threadtoken policy)
@@ -66,7 +73,7 @@ function intToUint8Array(num: number): Uint8Array {
   return arr;
 }
 // merkle tree stuff
-const data = [pkh+L.toHex(intToUint8Array(1)),pkh+L.toHex(intToUint8Array(22244))];
+const data = [pkh+L.toHex(intToUint8Array(1))+lockingAddressScriptHash+lockingAddressDatumHash,pkh+L.toHex(intToUint8Array(22244))+lockingAddressScriptHash+lockingAddressDatumHash];
 const dataUint = data.map( (a) => L.fromHex(a));
 const merkleTree = new L.MerkleTree(dataUint);
 const merkleRoot: Types.Hash = { hash: L.toHex(merkleTree.rootHash())};
@@ -124,11 +131,12 @@ const redeemer: Redeemer = {proof: merkleProof1, pkh: pkh, n: 22244n}
 //const redeemer: Redeemer = { n: 1n}
 
 async function mint(): Promise<L.TxHash> {
-    const threadTkn: L.Unit = L.toUnit(policyIdThread,L.fromText("test"));
+    const threadTkn: L.Unit = L.toUnit(policyIdThread,pkh);
     const tx = await lucid
       .newTx()
       .mintAssets({ [threadTkn]: 1n }, L.Data.to<Redeemer>(redeemer,Redeemer))
       .attachMintingPolicy(mintingScriptThread)
+      .payToContract(lockingAddress, L.Data.to(new L.Constr(0,[])),{[threadTkn]: 1n})
       .addSignerKey(pkh)
       .complete();
     const signedTx = await tx.sign().complete();
