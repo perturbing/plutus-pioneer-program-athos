@@ -79,7 +79,7 @@ const merkleTree = new L.MerkleTree(dataUint);
 const merkleRoot: Types.Hash = { hash: L.toHex(merkleTree.rootHash())};
 
 // a test member and proof
-const n = 1;
+const n = 0;
 const member = L.fromText(data[n])
 const merkleProof1 : Types.MerkleProof = merkleTree.getProof(dataUint[n]).map((p) =>
   p.left
@@ -127,7 +127,7 @@ const Redeemer = L.Data.Object({
 })
 type Redeemer = L.Data.Static<typeof Redeemer>
 
-const redeemer: Redeemer = {proof: merkleProof1, pkh: pkh, n: 22244n}
+const redeemer: Redeemer = {proof: merkleProof1, pkh: pkh, n: 1n}
 //const redeemer: Redeemer = { n: 1n}
 
 async function mint(): Promise<L.TxHash> {

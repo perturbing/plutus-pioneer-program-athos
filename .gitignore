@@ -4,6 +4,6 @@ node_modules/
 dist/
 dist-newstyle/
 code/Week05/lecture/secret.ts
-code/Certification/Mint/off-chain/seed.ts
+seed.ts
 code/Week08/tmp/
 code/Week08/assets/staking.plutus

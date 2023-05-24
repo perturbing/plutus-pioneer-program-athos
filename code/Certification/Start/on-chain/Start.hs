@@ -12,12 +12,11 @@
 
 module Start where
 
-import           Plutus.V2.Ledger.Api           (BuiltinData (..), ScriptContext,CurrencySymbol, mkValidatorScript,
-                                                Validator, ScriptContext (..), TxOutRef, ScriptPurpose (..), TxInfo (..)
-                                                , Value (..), TokenName (..), UnsafeFromData (..), PubKeyHash (..), TxOut (..), DatumHash (..), Address (..), Credential (..), ValidatorHash (..))
+import           Plutus.V2.Ledger.Api           (BuiltinData (..), ScriptContext,CurrencySymbol, ScriptContext (..), TxOutRef, ScriptPurpose (..), TxInfo (..)
+                                                , Value (..), TokenName (..), UnsafeFromData (..), PubKeyHash (..), TxOut (..), DatumHash (..), Address (..), Credential (..), ValidatorHash (..), TxInInfo (..))
 import           PlutusTx                       (compile, makeIsDataIndexed, CompiledCode)
-import           PlutusTx.Prelude               (Bool (..),BuiltinByteString,(&&),Integer, error, maybe, otherwise, ($), foldr, (<>), (==), find, (<$>), isJust, Maybe (..))
-import           Utilities                      (writeValidatorToFile, wrapValidator, writeCodeToFile, wrapPolicy)
+import           PlutusTx.Prelude               (Bool (..),BuiltinByteString,(&&),Integer, error, maybe, otherwise, ($), foldr, (<>), (==), find, (<$>), isJust, Maybe (..), any)
+import           Utilities                      (wrapValidator, writeCodeToFile, wrapPolicy)
 import           Prelude                        (IO, Monoid (mempty))
 import qualified Plutus.MerkleTree              as MT
 import           PlutusTx.AssocMap              (Map, empty, member, lookup, delete, singleton, keys)
@@ -66,7 +65,7 @@ makeIsDataIndexed ''MintRedeemer [('Mint,0),('Burn,1)]
 {-# INLINABLE mkThreadPolicy #-}
 mkThreadPolicy :: Parameters -> MintRedeemer -> ScriptContext -> Bool
 mkThreadPolicy params red ctx = case red of
-    Mint proof pkh n        -> foldr (&&) True [checkMember proof pkh n, txSignedBy txInfo (PubKeyHash pkh), checkValue pkh]
+    Mint proof pkh n        -> foldr (&&) (txSignedBy txInfo (PubKeyHash pkh)) [checkMember proof pkh n, checkMintValue pkh, checkStateNFT]
     Burn                    -> singleton (TokenName pkh') (-1) == ownPolMint
     where
         -- Checks that the concatination of the public key hash, participant number, scripthash and datum hash are a member of the merkle tree
@@ -74,8 +73,15 @@ mkThreadPolicy params red ctx = case red of
         checkMember proof pkh n = MT.member (pkh <> i2osp n <> threadScriptHash <> threadDatumHash) (merkleRoot params) proof -- still need to add scripthash <> datumHash
 
         -- Check that only the thread token is minted with the correct name (the pkh that is in the merkle tree)
-        checkValue :: BuiltinByteString -> Bool
-        checkValue pkh = singleton (TokenName pkh) 1 == ownPolMint && res == mempty
+        checkMintValue :: BuiltinByteString -> Bool
+        checkMintValue pkh = singleton (TokenName pkh) 1 == ownPolMint && res == mempty
+
+        -- Check that this transaction contains the state NFT that keeps track of who started their exam.
+        checkStateNFT :: Bool 
+        checkStateNFT = any filter (txInfoInputs txInfo)
+            where
+                filter :: TxInInfo -> Bool
+                filter TxInInfo{txInInfoResolved=TxOut{txOutValue}} = member (stateSymbol params) $ getValue txOutValue
 
         -- Rest of the code are variable initializations and auxiliary function definitions to support the checks above.
 
@@ -90,6 +96,7 @@ mkThreadPolicy params red ctx = case red of
         -- `splitValue` is called on the mint value in the transaction context to get values of this minting script's policy.
         (ownPolMint,res) = splitValue ownCur (txInfoMint txInfo)
 
+        -- `pkh'` is the public key hash of the participant, which is extracted from the token name of the thread token.
         pkh' :: BuiltinByteString
         pkh' = (\(x:_xs)-> unTokenName x) (keys ownPolMint)
 
@@ -138,8 +145,9 @@ data Redeemer = Unlock | SetBit Integer
 makeIsDataIndexed ''Redeemer [('Unlock,0),('SetBit,1)]
 
 {-# INLINABLE  mkStateScript #-}
-mkStateScript :: BuiltinByteString -> Redeemer -> ScriptContext -> Bool
-mkStateScript _bs red ctx = case red of
+-- This script is parametrized over the currency symbol of the above minting policy.
+mkStateScript :: CurrencySymbol -> BuiltinByteString -> Redeemer -> ScriptContext -> Bool
+mkStateScript _stateNFT _bs red ctx = case red of
     Unlock      -> True -- implement check if all ones later
     SetBit n    -> checkNotTheSame && checkUpdatedState n
     where
@@ -149,6 +157,12 @@ mkStateScript _bs red ctx = case red of
         checkUpdatedState :: Integer -> Bool 
         checkUpdatedState _n = True
 
+        -- Rest of the code are variable initializations and auxiliary function definitions to support the checks above.
+
+        -- `txInfo` is the transaction information of the current transaction context.
+        txInfo :: TxInfo
+        txInfo = scriptContextTxInfo ctx
+
         -- 'txOutRef' represents the transaction reference (Id + Index) of the output associated with the currently script being checked.
         _txOutRef = getRef ctx
             where
@@ -157,12 +171,14 @@ mkStateScript _bs red ctx = case red of
                 getRef _ = error ()
 
 {-# INLINABLE  mkWrappedStateScript #-}
-mkWrappedStateScript :: BuiltinData -> BuiltinData -> BuiltinData -> ()
-mkWrappedStateScript = wrapValidator mkStateScript
+mkWrappedStateScript :: BuiltinData -> BuiltinData -> BuiltinData -> BuiltinData -> ()
+mkWrappedStateScript symbol = wrapValidator $ mkStateScript symbol'
+    where 
+        symbol' = unsafeFromBuiltinData symbol
 
-stateValidator :: Validator
-stateValidator = mkValidatorScript $$(compile [|| mkWrappedStateScript ||])
+stateValCode :: CompiledCode (BuiltinData -> BuiltinData -> BuiltinData -> BuiltinData -> () )
+stateValCode = $$(compile [|| mkWrappedStateScript ||])
 
-saveStateValidator :: IO ()
-saveStateValidator = writeValidatorToFile "assets/stateValidator.plutus" stateValidator
+saveStateValidator:: IO ()
+saveStateValidator = writeCodeToFile "assets/start-state-validator.plutus" stateValCode
 
