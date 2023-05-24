@@ -16,7 +16,7 @@ import           Plutus.V2.Ledger.Api           (BuiltinData, ScriptContext,Curr
                                                 Validator, ScriptContext (..), TxOutRef, ScriptPurpose (..), TxInfo (..)
                                                 , Value (..), TokenName, UnsafeFromData (..), PubKeyHash (..))
 import           PlutusTx                       (compile, makeIsDataIndexed, CompiledCode)
-import           PlutusTx.Prelude               (Bool (..),BuiltinByteString,(&&),Integer, error, maybe, otherwise, ($), foldr, (<>))
+import           PlutusTx.Prelude               (Bool (..),BuiltinByteString,(&&),Integer, error, maybe, otherwise, ($), foldr, (<>), (==))
 import           Utilities                      (writeValidatorToFile, wrapValidator, writeCodeToFile, wrapPolicy)
 import           Prelude                        (IO)
 import qualified Plutus.MerkleTree              as MT
@@ -57,6 +57,7 @@ makeIsDataIndexed ''Parameters [('Parameters,0)]
 -- | Minting requires a Merkle membership proof, their public key hash, and their participant number.
 -- | Burning is always allowed.
 data MintRedeemer = Mint MT.Proof BuiltinByteString Integer | Burn
+--data MintRedeemer = Mint Integer | Burn
 -- Ensure Plutus data is indexed properly for the 'MintRedeemer' type.
 makeIsDataIndexed ''MintRedeemer [('Mint,0),('Burn,1)]
 
