@@ -12,15 +12,17 @@
 
 module Start where
 
-import           Plutus.V2.Ledger.Api (BuiltinData, ScriptContext,CurrencySymbol, mkValidatorScript,
-                                       Validator, ScriptContext (..), TxOutRef, ScriptPurpose (..), TxInfo (..), Value (..), TokenName, UnsafeFromData (..), PubKeyHash (..))
-import           PlutusTx             (compile, makeIsDataIndexed, CompiledCode)
-import           PlutusTx.Prelude     (Bool (..),BuiltinByteString,(&&),Integer, error, maybe, otherwise, ($), foldr, (<>), (<), (==), consByteString, emptyByteString, quotient, remainder)
-import           Utilities            (writeValidatorToFile, wrapValidator, writeCodeToFile, wrapPolicy)
-import           Prelude              (IO)
-import qualified Plutus.MerkleTree    as MT
-import PlutusTx.AssocMap (Map, empty, member, lookup, delete)
-import Plutus.V2.Ledger.Contexts (ownCurrencySymbol, txSignedBy)
+import           Plutus.V2.Ledger.Api           (BuiltinData, ScriptContext,CurrencySymbol, mkValidatorScript,
+                                                Validator, ScriptContext (..), TxOutRef, ScriptPurpose (..), TxInfo (..)
+                                                , Value (..), TokenName, UnsafeFromData (..), PubKeyHash (..))
+import           PlutusTx                       (compile, makeIsDataIndexed, CompiledCode)
+import           PlutusTx.Prelude               (Bool (..),BuiltinByteString,(&&),Integer, error, maybe, otherwise, ($), foldr, (<>))
+import           Utilities                      (writeValidatorToFile, wrapValidator, writeCodeToFile, wrapPolicy)
+import           Prelude                        (IO)
+import qualified Plutus.MerkleTree              as MT
+import           PlutusTx.AssocMap              (Map, empty, member, lookup, delete)
+import           Plutus.V2.Ledger.Contexts      (ownCurrencySymbol, txSignedBy)
+import           Plutus.Crypto.Number.Serialize (i2osp)
 
 -- [General notes on this file]
 -- This file contains two plutus scripts, the minting logic of the thread token and the logic of the validator that locks the 
@@ -36,20 +38,6 @@ splitValue symbol val
     | member symbol val'  = (maybe empty (\x -> x) (lookup symbol val'), Value (delete symbol val'))
     | otherwise           = (empty,val)
     where val' = getValue val
-
-{-# INLINABLE i2osp #-}
--- | i2osp converts a positive integer into a builtin byte string
---   Plutus version of `(Crypto.Number.Serialize.i2osp)`
---   As per rfc3447, the first byte is the most significant byte.
---   This function will give an error for a negative integer.
-i2osp :: Integer -> BuiltinByteString
-i2osp n
-    | n < 0     = error ()
-    | n == 0    = consByteString 0 emptyByteString
-    | otherwise = go n
-    where go m 
-            | m == 0    = emptyByteString
-            | otherwise = go (m `quotient` 256) <> consByteString (m `remainder` 256) emptyByteString
 
 ----------------------------------- MINTING-VALIDATOR ---------------------------------------------
 -- TODO: General note on what this minting policy does.

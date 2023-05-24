@@ -9,6 +9,9 @@ build-type:         Simple
 library
     hs-source-dirs:   src
     exposed-modules:  Utilities
+                    , Plutus.Crypto.Number.ModArithmetic
+                    , Plutus.Crypto.Number.Serialize
+                    , Plutus.Data.Bits
     other-modules:    Utilities.Conversions
                       Utilities.PlutusTx
                       Utilities.Serialise

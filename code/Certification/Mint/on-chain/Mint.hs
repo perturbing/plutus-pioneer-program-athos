@@ -11,25 +11,25 @@
 
 module Mint where
 
-import           Plutus.V2.Ledger.Api (BuiltinData, ScriptContext,CurrencySymbol,
-                                       MintingPolicy, mkMintingPolicyScript, mkValidatorScript,
-                                       Validator, ScriptContext (..), TxInfo (..),
-                                       TxInInfo (..), TokenName (..), Value (..),TxOut ,txOutValue,
-                                       txOutAddress, txOutDatum, OutputDatum (..), DatumHash (..), TxOut (..),
-                                       adaSymbol, PubKeyHash (..), ScriptPurpose (..), Address, TxOutRef)
-import           Plutus.V2.Ledger.Contexts (ownCurrencySymbol, findDatum, txSignedBy)
-import           PlutusTx             (compile, makeIsDataIndexed, CompiledCode, unsafeFromBuiltinData)
-import Plutus.V1.Ledger.Value         (flattenValue)
-import PlutusTx.AssocMap              (delete, empty, insert, keys, lookup, member, singleton, Map )
-import PlutusTx.Maybe                 (isJust, maybe )
-import PlutusTx.Eq                    (Eq(..) )
-import           PlutusTx.Prelude     (Bool (..), BuiltinByteString, ($), (&&), Integer, error,
-                                      otherwise, (<>), (<$>), find, foldr,
-                                      map, elem, negate)
-import           Utilities            (wrapPolicy, writeCodeToFile,writePolicyToFile, currencySymbol,
-                                      writeValidatorToFile, wrapValidator)
-import           Prelude              (IO)
-import qualified Plutus.MerkleTree    as MT
+import           Plutus.V2.Ledger.Api       (BuiltinData, ScriptContext,CurrencySymbol,
+                                            MintingPolicy, mkMintingPolicyScript, mkValidatorScript,
+                                            Validator, ScriptContext (..), TxInfo (..),
+                                            TxInInfo (..), TokenName (..), Value (..),TxOut ,txOutValue,
+                                            txOutAddress, txOutDatum, OutputDatum (..), DatumHash (..), TxOut (..),
+                                            adaSymbol, PubKeyHash (..), ScriptPurpose (..), Address, TxOutRef)
+import           Plutus.V2.Ledger.Contexts  (ownCurrencySymbol, findDatum, txSignedBy)
+import           PlutusTx                   (compile, makeIsDataIndexed, CompiledCode, unsafeFromBuiltinData)
+import           Plutus.V1.Ledger.Value     (flattenValue)
+import           PlutusTx.AssocMap          (delete, empty, insert, keys, lookup, member, singleton, Map )
+import           PlutusTx.Maybe             (isJust, maybe )
+import           PlutusTx.Eq                (Eq(..) )
+import           PlutusTx.Prelude           (Bool (..), BuiltinByteString, ($), (&&), Integer, error,
+                                            otherwise, (<>), (<$>), find, foldr,
+                                            map, elem, negate)
+import           Utilities                  (wrapPolicy, writeCodeToFile,writePolicyToFile, currencySymbol,
+                                            writeValidatorToFile, wrapValidator)
+import           Prelude                    (IO)
+import qualified Plutus.MerkleTree          as MT
 
 -- [General notes on this file]
 -- This file contains two plutus scripts, the minting logic of the PPP NFT and the logic of the validator that locks the 
