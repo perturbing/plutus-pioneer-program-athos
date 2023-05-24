@@ -8,11 +8,9 @@ module Plutus.Crypto.Number.Serialize (
 , lengthBytes
 ) where
 
-import PlutusTx
 import PlutusTx.Prelude
 
 import Plutus.Crypto.Number.ModArithmetic
-import Plutus.Data.Bits
 
 -- | i2osp converts a positive integer into a builtin byte string
 --   Plutus version of `(Crypto.Number.Serialize.i2osp)`
@@ -23,7 +21,7 @@ i2osp n
     | n < 0     = error ()
     | n == 0    = consByteString 0 emptyByteString
     | otherwise = go n
-    where go m 
+    where go m
             | m == 0    = emptyByteString
             | otherwise = go (m `quotient` 256) <> consByteString (m `remainder` 256) emptyByteString
 {-# INLINABLE i2osp #-}
@@ -33,7 +31,7 @@ i2osp n
 --   As per rfc3447, the first byte is the most significant byte
 --   This function will give an error for an empty builtin byte string
 os2ip :: BuiltinByteString -> Integer
-os2ip bs 
+os2ip bs
     | bs == emptyByteString = error ()
     | otherwise             = go bs
     where len xs = lengthOfByteString xs - 1
@@ -49,9 +47,9 @@ os2ip bs
 --   otherwise the number is padded with 0 to fit the len required. 
 --   Plutus version of `(Crypto.Number.Serialize.i2ospOf)`
 i2ospOf :: Integer -> Integer -> Maybe BuiltinByteString
-i2ospOf len n 
+i2ospOf len n
     | n >= 256 `exponentiate` len   = Nothing
-    | otherwise                     = Just ((nullPadding (len - lengthOfByteString bs)) <> bs)
+    | otherwise                     = Just (nullPadding (len - lengthOfByteString bs) <> bs)
     where bs = i2osp n
 {-# INLINABLE i2ospOf #-}
 
@@ -68,7 +66,7 @@ i2ospOf_ len n = nullPadding (len - lengthOfByteString bs) <> bs
 -- | Returns the number of bytes that are needed store an integer with i2osp
 --   Plutus version of `(Crypto.Number.Serialize.lengthBytes)`
 lengthBytes :: Integer -> Integer
-lengthBytes n = go 1 n 
+lengthBytes = go 1
     where go acc n
             | n < 256 `exponentiate` acc    = acc
             | otherwise                     = go (acc+1) n
@@ -76,7 +74,7 @@ lengthBytes n = go 1 n
 
 -- | generate a builtin byte string of "\null" bytes of length n
 nullPadding :: Integer -> BuiltinByteString
-nullPadding n = go n (consByteString 0 emptyByteString)
+nullPadding k = go k (consByteString 0 emptyByteString)
     where go n bs
             | n == 0      = emptyByteString
             | even n      = go (n `divide` 2) bs <> go (n `divide` 2) bs

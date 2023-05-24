@@ -25,25 +25,25 @@ import Plutus.Crypto.Number.ModArithmetic
 --   Note that this function is unsafe for negative integer.
 --   Since it is used internally in this module no error is thrown
 boolPadding :: Integer -> [Bool]
-boolPadding n 
+boolPadding n
     | n==0      = []
-    | otherwise = [False] ++ boolPadding (n-1)
+    | otherwise = False : boolPadding (n-1)
 {-# INLINABLE boolPadding #-}
 
 -- | A visual representation of a bytestring for a low level view (little endian)
 --   Note that for a negative integer this does not terminate.
 --   Since it is used internally in this module no error is thrown.
 intToBitsLE :: Integer -> [Bool]
-intToBitsLE n 
+intToBitsLE n
     | n == 0 = []
-    | otherwise = [n `remainder` 2 == 1 ] ++ intToBitsLE (n `quotient` 2)
+    | otherwise = (n `remainder` 2 == 1) : intToBitsLE (n `quotient` 2)
 {-# INLINABLE intToBitsLE #-}
 
 -- | Convert an positive integer smaller than 256 into its little endian
 --   representation viewed as a list of bools.
 --   This function will give an error if the integer is negative or bigger.
 intToByteLE :: Integer -> [Bool]
-intToByteLE n 
+intToByteLE n
     | n > 255 || n < 0  = error ()
     | otherwise         = xs ++ boolPadding (8 - length xs)
     where xs = intToBitsLE n
@@ -51,11 +51,11 @@ intToByteLE n
 
 -- | Convert bits represented as a list of bools into an integer (little endian)
 bitsLEToInt :: [Bool] -> Integer
-bitsLEToInt list = go 0 list
-    where 
+bitsLEToInt = go 0
+    where
         go _ [] = error ()
         go n (x:xs)
-            | xs == []  = if x then 2 `exponentiate` n else 0
+            | null xs  = if x then 2 `exponentiate` n else 0
             | x         = 2 `exponentiate` n + go (n+1) xs
             | otherwise = go (n+1) xs
 {-# INLINABLE bitsLEToInt #-}
@@ -72,7 +72,7 @@ byteLEToInt xs
 --   Note that for a negative integer this does not terminate.
 --   Since it is used internally in this module no error is thrown.
 intToBitsBE :: Integer -> [Bool]
-intToBitsBE n 
+intToBitsBE n
     | n == 0 = []
     | otherwise = intToBitsBE (n `quotient` 2) ++ [n `remainder` 2 == 1 ]
 {-# INLINABLE intToBitsBE #-}
@@ -81,7 +81,7 @@ intToBitsBE n
 --   representation viewed as a list of bools.
 --   This function will give an error if the integer is negative or bigger.
 intToByteBE :: Integer -> [Bool]
-intToByteBE n 
+intToByteBE n
     | n > 255 || n < 0  = error ()
     | otherwise         = boolPadding (8 - length xs) ++ xs
     where xs = intToBitsBE n
@@ -111,7 +111,7 @@ reverseByte = byteLEToInt . intToByteBE
 {-# INLINABLE reverseByte #-}
 
 -- | Reverse a builtin byte string of arbitrary length
-reverseBS :: BuiltinByteString -> BuiltinByteString 
+reverseBS :: BuiltinByteString -> BuiltinByteString
 reverseBS bs
     | bs == emptyByteString = bs
     | otherwise             = reverseBS (dropByteString 1 bs) <> consByteString (reverseByte (indexByteString bs 0)) emptyByteString
@@ -166,46 +166,46 @@ testBit' :: [Bool] -> Integer -> Bool
 testBit' xs n = xs !! n
 {-# INLINABLE testBit' #-}
 
--- | Set the value of a bit at position n of a builtin bytestring.
+-- | Set the value of a bit at position n of a 'BuiltinByteString`.
 --   Plutus version of `(Data.Bits.setBit)`.
 --   This function acts from the left.
 --
 --   This function will give an error for negative positions and 
---   positions bigger than the size of the builtin bytestring in bits.
+--   positions bigger than the size of the 'BuiltinByteString` in bits.
 setBit :: BuiltinByteString -> Integer -> BuiltinByteString
 setBit bs n
     | n < 0 || n >= 8 * lengthOfByteString bs   = error ()
-    | otherwise                                 = takeByteString bytePos bs <> 
-                                                    consByteString 
+    | otherwise                                 = takeByteString bytePos bs <>
+                                                    consByteString
                                                     (byteBEToInt (setBit' (intToByteBE (indexByteString suffix' 0)) (n `remainder` 8)))
                                                     (dropByteString 1 suffix')
     where bytePos       = n `quotient` 8
           suffix'       = dropByteString bytePos bs
 {-# INLINABLE setBit #-}
 
--- | Clear the value of a bit at position n of a builtin bytestring.
+-- | Clear the value of a bit at position n of a 'BuiltinByteString`.
 --   Plutus version of `(Data.Bits.clearBit)`.
 --   This function acts from the left.
 --
 --   This function will give an error for negative positions and 
---   positions bigger than the size of the builtin bytestring in bits.
+--   positions bigger than the size of the 'BuiltinByteString` in bits.
 clearBit :: BuiltinByteString -> Integer -> BuiltinByteString
 clearBit bs n
     | n < 0 || n >= 8 * lengthOfByteString bs   = error ()
-    | otherwise                                 = takeByteString bytePos bs <> 
-                                                    consByteString 
+    | otherwise                                 = takeByteString bytePos bs <>
+                                                    consByteString
                                                     (byteBEToInt (clearBit' (intToByteBE (indexByteString suffix' 0)) (n `remainder` 8)))
                                                     (dropByteString 1 suffix')
     where bytePos       = n `quotient` 8
           suffix'       = dropByteString bytePos bs
 {-# INLINABLE clearBit #-}
 
--- | Test the value of a bit at position n of a builtin bytestring.
+-- | Test the value of a bit at position n of a `BuiltinBytestring`.
 --   Plutus version of `(Data.Bits.testBit)`.
 --   This function acts from the left.
 --
 --   This function will give an error for negative positions and 
---   positions bigger than the size of the builtin bytestring in bits.
+--   positions bigger than the size of the 'BuiltinByteString` in bits.
 testBit :: BuiltinByteString -> Integer -> Bool
 testBit bs n
     | n < 0 || n >= 8 * lengthOfByteString bs   = error ()

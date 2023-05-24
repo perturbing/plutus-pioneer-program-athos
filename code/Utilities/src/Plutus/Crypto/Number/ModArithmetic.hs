@@ -14,8 +14,8 @@ exponentiate x n
     | n < 0 || x < 0    = error ()
     | n == 0            = 1
     | x == 0            = 0
-    | even n            = (exponentiate x (n `divide` 2)) * (exponentiate x (n `divide` 2))
-    | otherwise         = x * (exponentiate x ((n - 1) `divide` 2)) * (exponentiate x ((n - 1) `divide` 2))
+    | even n            = exponentiate x (n `divide` 2) * exponentiate x (n `divide` 2)
+    | otherwise         = x * exponentiate x ((n - 1) `divide` 2) * exponentiate x ((n - 1) `divide` 2)
 {-# INLINABLE exponentiate #-}
 
 -- | Exponentiate b^e mod m.
@@ -27,6 +27,6 @@ exponentiateMod b e m
     | e == 0    = 1
     | e == 1    = b `modulo` m
     | even e    = let p = exponentiateMod b (e `divide` 2) m `modulo` m
-                   in (exponentiate p 2) `modulo` m
+                   in exponentiate p 2 `modulo` m
     | otherwise = (b * exponentiateMod b (e - 1) m) `modulo` m
 {-# INLINABLE exponentiateMod #-}
