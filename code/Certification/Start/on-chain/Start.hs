@@ -48,7 +48,7 @@ data Parameters = Parameters {
                     merkleRoot          :: MT.Hash
     ,
                     -- | the currency symbol of the tokens that are locked with the state.
-                    statePolicy         :: CurrencySymbol
+                    stateSymbol         :: CurrencySymbol
 }
 -- Ensure Plutus data indexing is fixed properly for the 'Parameters' type.
 makeIsDataIndexed ''Parameters [('Parameters,0)]
