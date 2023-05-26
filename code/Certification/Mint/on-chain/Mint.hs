@@ -25,7 +25,7 @@ import           PlutusTx.Maybe             (isJust, maybe )
 import           PlutusTx.Eq                (Eq(..) )
 import           PlutusTx.Prelude           (Bool (..), BuiltinByteString, ($), (&&), Integer, error,
                                             otherwise, (<>), (<$>), find, foldr,
-                                            map, elem, negate)
+                                            map, elem, negate, null)
 import           Utilities                  (wrapPolicy, writeCodeToFile,writePolicyToFile, currencySymbol,
                                             writeValidatorToFile, wrapValidator)
 import           Prelude                    (IO)
@@ -97,7 +97,7 @@ mkNFTPolicy params red ctx = case red of
 
         -- Checks that the datum and public key hash are a member of the Merkle tree, confirming valid participant.
         checkMember :: MT.Proof -> Bool
-        checkMember proof = MT.member (pkh <> refDatumHash) (merkleRoot params) proof
+        checkMember = MT.member (pkh <> refDatumHash) (merkleRoot params)
 
         -- Checks that the value send to the lock adress only contains the reference token.
         -- This is needed since the lock script at this address only unlocks if all value is burned
@@ -122,7 +122,7 @@ mkNFTPolicy params red ctx = case red of
         -- `pkh` is the public key hash of the participant, which is extracted from the token name of the thread token.
         -- This step also validates that only one token is burned under this thread policy.
         pkh :: BuiltinByteString
-        pkh = (\(x:xs)-> if xs == [] then unTokenName x else error ()) (keys threadPolMint)
+        pkh = (\(x:xs)-> if null xs then unTokenName x else error ()) (keys threadPolMint)
 
         -- `refUtxo` is the transaction output that contains the reference NFT.
         refUtxo :: TxOut

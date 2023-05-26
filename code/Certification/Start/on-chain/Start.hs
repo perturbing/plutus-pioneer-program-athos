@@ -13,9 +13,10 @@
 module Start where
 
 import           Plutus.V2.Ledger.Api           (BuiltinData (..), ScriptContext,CurrencySymbol, ScriptContext (..), TxOutRef, ScriptPurpose (..), TxInfo (..)
-                                                , Value (..), TokenName (..), UnsafeFromData (..), PubKeyHash (..), TxOut (..), DatumHash (..), Address (..), Credential (..), ValidatorHash (..), TxInInfo (..))
+                                                , Value (..), TokenName (..), UnsafeFromData (..), PubKeyHash (..), TxOut (..), DatumHash (..), Address (..),
+                                                Credential (..), ValidatorHash (..), TxInInfo (..))
 import           PlutusTx                       (compile, makeIsDataIndexed, CompiledCode)
-import           PlutusTx.Prelude               (Bool (..),BuiltinByteString,(&&),Integer, error, maybe, otherwise, ($), foldr, (<>), (==), find, (<$>), isJust, Maybe (..), any)
+import           PlutusTx.Prelude               (Bool (..),BuiltinByteString,(&&),Integer, error, maybe, otherwise, ($), foldr, (<>), (==), find, isJust, Maybe (..), any)
 import           Utilities                      (wrapValidator, writeCodeToFile, wrapPolicy)
 import           Prelude                        (IO, Monoid (mempty))
 import qualified Plutus.MerkleTree              as MT
@@ -70,7 +71,7 @@ mkThreadPolicy params red ctx = case red of
     where
         -- Checks that the concatination of the public key hash, participant number, scripthash and datum hash are a member of the merkle tree
         checkMember :: MT.Proof -> BuiltinByteString -> Integer -> Bool
-        checkMember proof pkh n = MT.member (pkh <> i2osp n <> threadScriptHash <> threadDatumHash) (merkleRoot params) proof -- still need to add scripthash <> datumHash
+        checkMember proof pkh n = MT.member (pkh <> i2osp n <> threadScriptHash <> threadDatumHash) (merkleRoot params) proof
 
         -- Check that only the thread token is minted with the correct name (the pkh that is in the merkle tree)
         checkMintValue :: BuiltinByteString -> Bool
@@ -100,12 +101,12 @@ mkThreadPolicy params red ctx = case red of
         pkh' :: BuiltinByteString
         pkh' = (\(x:_xs)-> unTokenName x) (keys ownPolMint)
 
-        -- `refUtxo` is the transaction output that contains the reference NFT.
+        -- `threadUtxo` is the transaction output that contains the thread token.
         threadUtxo :: TxOut
         threadUtxo = maybe (error ()) (\x -> x) (find myfilter (txInfoOutputs txInfo))
             where
                 myfilter :: TxOut -> Bool
-                myfilter output = maybe False (\x -> x) $ member (TokenName pkh') <$> lookup ownCur (getValue (txOutValue output))
+                myfilter output = member ownCur (getValue (txOutValue output)) 
 
         -- `refDatumHash` is the datum hash of the reference transaction output.
         -- Even though it's not an inline datum, the full datum is validated to be attached in the witness set.
@@ -160,8 +161,8 @@ mkStateScript _stateNFT _bs red ctx = case red of
         -- Rest of the code are variable initializations and auxiliary function definitions to support the checks above.
 
         -- `txInfo` is the transaction information of the current transaction context.
-        txInfo :: TxInfo
-        txInfo = scriptContextTxInfo ctx
+        _txInfo :: TxInfo
+        _txInfo = scriptContextTxInfo ctx
 
         -- 'txOutRef' represents the transaction reference (Id + Index) of the output associated with the currently script being checked.
         _txOutRef = getRef ctx
