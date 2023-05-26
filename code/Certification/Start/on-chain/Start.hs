@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds         #-}
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE BinaryLiterals    #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE NamedFieldPuns    #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
@@ -12,7 +12,7 @@ module Start where
 
 import           Plutus.V2.Ledger.Api           (BuiltinData (..), ScriptContext,CurrencySymbol, ScriptContext (..), TxOutRef, ScriptPurpose (..), TxInfo (..)
                                                 , Value (..), TokenName (..), UnsafeFromData (..), PubKeyHash (..), TxOut (..), DatumHash (..), Address (..),
-                                                Credential (..), ValidatorHash (..), TxInInfo (..))
+                                                Credential (..), ValidatorHash (..), TxInInfo (..), Redeemer (..), FromData (..))
 import           PlutusTx                       (compile, makeIsDataIndexed, CompiledCode)
 import           PlutusTx.Prelude               (Bool (..),BuiltinByteString,(&&),Integer, error, maybe, otherwise, ($), foldr, (<>), (==), find, isJust, Maybe (..), any)
 import           Utilities                      (wrapValidator, writeCodeToFile, wrapPolicy)
@@ -142,36 +142,62 @@ saveThreadPolicy = writeCodeToFile "assets/start-policy.plutus" threadCode
 
 --------------------- The state validator -------------
 
-data Redeemer = Unlock | SetBit Integer
+data MyRedeemer = SetBit | Unlock 
 -- Ensure Plutus data is indexed properly for the 'Redeemer' type.
-makeIsDataIndexed ''Redeemer [('Unlock,0),('SetBit,1)]
+makeIsDataIndexed ''MyRedeemer [('SetBit,0),('Unlock,1)]
 
 {-# INLINABLE  mkStateScript #-}
 -- This script is parametrized over the currency symbol of the above minting policy.
-mkStateScript :: CurrencySymbol -> BuiltinByteString -> Redeemer -> ScriptContext -> Bool
-mkStateScript _stateNFT _bs red ctx = case red of
+mkStateScript :: CurrencySymbol -> BuiltinByteString -> MyRedeemer -> ScriptContext -> Bool
+mkStateScript threadSymbol dtm red ctx = case red of
+    -- A participant can update 
+    SetBit       -> checkNotTheSame && checkUpdatedState
     -- In case all participants started their exam, the state utxo can be unlocked.
-    Unlock      -> True -- implement check if all ones later
-    SetBit n    -> checkNotTheSame && checkUpdatedState n
+    -- For two participants that is if datum = Ob11 (in BE notation that is a bytestring wiith one byte (00000011))
+    Unlock      -> dtm == i2osp 0b11
     where
         checkNotTheSame :: Bool
         checkNotTheSame = True
 
-        checkUpdatedState :: Integer -> Bool 
-        checkUpdatedState _n = True
+        checkUpdatedState :: Bool 
+        checkUpdatedState = True
 
         -- Rest of the code are variable initializations and auxiliary function definitions to support the checks above.
 
         -- `txInfo` is the transaction information of the current transaction context.
-        _txInfo :: TxInfo
-        _txInfo = scriptContextTxInfo ctx
+        txInfo :: TxInfo
+        txInfo = scriptContextTxInfo ctx
+
+        mintRedeemer :: Redeemer
+        mintRedeemer = maybe (error ()) (\x -> x) (lookup (Minting threadSymbol) (txInfoRedeemers txInfo))
+
+        _bitNumber :: Integer
+        _bitNumber = case fromBuiltinData (getRedeemer mintRedeemer) of
+          Just (Mint _ _ n) -> n
+          Just Burn         -> error ()
+          Nothing           -> error ()
 
         -- 'txOutRef' represents the transaction reference (Id + Index) of the output associated with the currently script being checked.
-        _txOutRef = getRef ctx
+        txOutRef :: TxOutRef
+        txOutRef = getRef ctx
             where
                 getRef :: ScriptContext -> TxOutRef
                 getRef ScriptContext{scriptContextPurpose=Spending ref} = ref
                 getRef _ = error ()
+
+        -- `refUtxo` fetches the transaction output that corresponds to `txOutRef`.
+        refUtxo :: TxOut
+        refUtxo = maybe (error ()) txInInfoResolved (find myfilter (txInfoInputs txInfo))
+            where
+                -- `myfilter` is a helper function to filter for the transaction input info corresponding to `txOutRef`
+                myfilter :: TxInInfo -> Bool
+                myfilter TxInInfo{txInInfoOutRef} = txOutRef == txInInfoOutRef
+
+        -- `ownValue` is the value associated with `txOutRef`, excluding Ada.
+        _ownValue :: Value
+        _ownValue = txOutValue refUtxo
+
+
 
 {-# INLINABLE  mkWrappedStateScript #-}
 mkWrappedStateScript :: BuiltinData -> BuiltinData -> BuiltinData -> BuiltinData -> ()
