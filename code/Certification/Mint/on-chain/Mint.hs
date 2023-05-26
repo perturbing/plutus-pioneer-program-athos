@@ -2,7 +2,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
-{-# LANGUAGE TypeApplications  #-}
 {-# LANGUAGE TypeFamilies      #-}
 {-# LANGUAGE NamedFieldPuns    #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
@@ -47,8 +46,8 @@ splitValue symbol val
     where val' = getValue val
 
 ----------------------------------- MINTING-VALIDATOR ---------------------------------------------
---  This minting policy allows for minting of a unique NFT (Non-Fungible Token) upon burning of the thread token,
---  along with a merkle proof of the datum. The 'mkNFTPolicy' function below holds the core logic of this policy.
+--  This minting policy allows for minting of a unique NFT upon burning of the thread token,
+--  along with a merkle proof of the metadata datum hash. The 'mkNFTPolicy' function below holds the core logic of this policy.
 
 
 -- | 'Parameters' data type holds all the necessary information needed for setting up the minting policy.
@@ -83,8 +82,10 @@ makeIsDataIndexed ''Redeemer [('Mint,0),('Burn,1)]
 {-# INLINABLE mkNFTPolicy #-}
 mkNFTPolicy :: Parameters -> Redeemer -> ScriptContext -> Bool
 mkNFTPolicy params red ctx = case red of
-    Mint proof  -> foldr (&&) checkValues [checkDatumAddr, checkMember proof, checkRefValue, txSignedBy txInfo (PubKeyHash pkh)] -- Minting is possible if all these conditions are met.
-    Burn pkh'   -> ownPolMint == insert (TokenName (prefixNFT params <> pkh')) (-1) (singleton (TokenName (prefixRef params <> pkh')) (-1)) -- burning can only happen is you burn both reference and NFT token
+    -- Minting is possible if all these conditions are met.
+    Mint proof  -> foldr (&&) checkValues [checkDatumAddr, checkMember proof, checkRefValue, txSignedBy txInfo (PubKeyHash pkh)] 
+    -- burning can only happen is you burn both reference and NFT token
+    Burn pkh'   -> ownPolMint == insert (TokenName (prefixNFT params <> pkh')) (-1) (singleton (TokenName (prefixRef params <> pkh')) (-1)) 
     where
         -- Checks that the thread token is burned and one reference and one user NFT are minted.
         checkValues :: Bool

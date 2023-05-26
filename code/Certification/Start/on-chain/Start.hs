@@ -2,8 +2,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
-{-# LANGUAGE TypeApplications  #-}
-{-# LANGUAGE TypeFamilies      #-}
 {-# LANGUAGE NamedFieldPuns    #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use id" #-}
@@ -66,7 +64,9 @@ makeIsDataIndexed ''MintRedeemer [('Mint,0),('Burn,1)]
 {-# INLINABLE mkThreadPolicy #-}
 mkThreadPolicy :: Parameters -> MintRedeemer -> ScriptContext -> Bool
 mkThreadPolicy params red ctx = case red of
+    -- Minting is possible if all these conditions are met.
     Mint proof pkh n        -> foldr (&&) (txSignedBy txInfo (PubKeyHash pkh)) [checkMember proof pkh n, checkMintValue pkh, checkStateNFT]
+    -- Burning is always possible, as long as a transaction burns 1 thread token at a time.
     Burn                    -> singleton (TokenName pkh') (-1) == ownPolMint
     where
         -- Checks that the concatination of the public key hash, participant number, scripthash and datum hash are a member of the merkle tree
@@ -119,6 +119,7 @@ mkThreadPolicy params red ctx = case red of
                     OutputDatumHash (DatumHash h)   -> if isJust (findDatum (DatumHash h) txInfo) then h else error ()
                     OutputDatum _                   -> error ()
 
+        -- 'threadScriptHash` is the script hash of the datum of the utxo that locks the thread token.
         threadScriptHash :: BuiltinByteString
         threadScriptHash = fetchScriptHash threadUtxo
             where
@@ -149,6 +150,7 @@ makeIsDataIndexed ''Redeemer [('Unlock,0),('SetBit,1)]
 -- This script is parametrized over the currency symbol of the above minting policy.
 mkStateScript :: CurrencySymbol -> BuiltinByteString -> Redeemer -> ScriptContext -> Bool
 mkStateScript _stateNFT _bs red ctx = case red of
+    -- In case all participants started their exam, the state utxo can be unlocked.
     Unlock      -> True -- implement check if all ones later
     SetBit n    -> checkNotTheSame && checkUpdatedState n
     where
