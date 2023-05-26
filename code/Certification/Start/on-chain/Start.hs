@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds         #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE BinaryLiterals    #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE NamedFieldPuns    #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
@@ -12,7 +13,7 @@ module Start where
 
 import           Plutus.V2.Ledger.Api           (BuiltinData (..), ScriptContext,CurrencySymbol, ScriptContext (..), TxOutRef, ScriptPurpose (..), TxInfo (..)
                                                 , Value (..), TokenName (..), UnsafeFromData (..), PubKeyHash (..), TxOut (..), DatumHash (..), Address (..),
-                                                Credential (..), ValidatorHash (..), TxInInfo (..), Redeemer (..), FromData (..))
+                                                Credential (..), ValidatorHash (..), TxInInfo (..), Redeemer (..), FromData (..), Datum (..))
 import           PlutusTx                       (compile, makeIsDataIndexed, CompiledCode)
 import           PlutusTx.Prelude               (Bool (..),BuiltinByteString,(&&),Integer, error, maybe, otherwise, ($), foldr, (<>), (==), find, isJust, Maybe (..), any)
 import           Utilities                      (wrapValidator, writeCodeToFile, wrapPolicy)
@@ -22,6 +23,7 @@ import           PlutusTx.AssocMap              (Map, empty, member, lookup, del
 import           Plutus.V2.Ledger.Contexts      (ownCurrencySymbol, txSignedBy, findDatum)
 import           Plutus.Crypto.Number.Serialize (i2osp)
 import           Plutus.V2.Ledger.Tx            (OutputDatum(..))
+import           Plutus.Data.Bits               (setBit, reverseBS)
 
 -- [General notes on this file]
 -- This file contains two plutus scripts, the minting logic of the thread token and the logic of the validator that locks the 
@@ -142,7 +144,7 @@ saveThreadPolicy = writeCodeToFile "assets/start-policy.plutus" threadCode
 
 --------------------- The state validator -------------
 
-data MyRedeemer = SetBit | Unlock 
+data MyRedeemer = SetBit Integer | Unlock 
 -- Ensure Plutus data is indexed properly for the 'Redeemer' type.
 makeIsDataIndexed ''MyRedeemer [('SetBit,0),('Unlock,1)]
 
@@ -151,16 +153,16 @@ makeIsDataIndexed ''MyRedeemer [('SetBit,0),('Unlock,1)]
 mkStateScript :: CurrencySymbol -> BuiltinByteString -> MyRedeemer -> ScriptContext -> Bool
 mkStateScript threadSymbol dtm red ctx = case red of
     -- A participant can update 
-    SetBit       -> checkNotTheSame && checkUpdatedState
+    SetBit n      -> checkStateUpdate n && checkStateAddress
     -- In case all participants started their exam, the state utxo can be unlocked.
     -- For two participants that is if datum = Ob11 (in BE notation that is a bytestring wiith one byte (00000011))
     Unlock      -> dtm == i2osp 0b11
     where
-        checkNotTheSame :: Bool
-        checkNotTheSame = True
+        checkStateUpdate :: Integer -> Bool
+        checkStateUpdate n = newDatum == reverseBS (setBit dtm n)
 
-        checkUpdatedState :: Bool 
-        checkUpdatedState = True
+        checkStateAddress :: Bool 
+        checkStateAddress = txOutAddress refUtxo == txOutAddress newRefUtxo
 
         -- Rest of the code are variable initializations and auxiliary function definitions to support the checks above.
 
@@ -168,9 +170,11 @@ mkStateScript threadSymbol dtm red ctx = case red of
         txInfo :: TxInfo
         txInfo = scriptContextTxInfo ctx
 
+        -- 'mintRedeemer' is the redeemer of the thread token minting policy that is defined above.
         mintRedeemer :: Redeemer
         mintRedeemer = maybe (error ()) (\x -> x) (lookup (Minting threadSymbol) (txInfoRedeemers txInfo))
 
+        -- 'bitNumber' is the bit number that needs to be flipt according to the merkle proof in the above minting script.
         _bitNumber :: Integer
         _bitNumber = case fromBuiltinData (getRedeemer mintRedeemer) of
           Just (Mint _ _ n) -> n
@@ -182,21 +186,41 @@ mkStateScript threadSymbol dtm red ctx = case red of
         txOutRef = getRef ctx
             where
                 getRef :: ScriptContext -> TxOutRef
-                getRef ScriptContext{scriptContextPurpose=Spending ref} = ref
+                getRef ScriptContext{scriptContextPurpose= Spending ref} = ref
                 getRef _ = error ()
 
         -- `refUtxo` fetches the transaction output that corresponds to `txOutRef`.
         refUtxo :: TxOut
-        refUtxo = maybe (error ()) txInInfoResolved (find myfilter (txInfoInputs txInfo))
-            where
-                -- `myfilter` is a helper function to filter for the transaction input info corresponding to `txOutRef`
-                myfilter :: TxInInfo -> Bool
-                myfilter TxInInfo{txInInfoOutRef} = txOutRef == txInInfoOutRef
+        refUtxo = maybe (error ()) txInInfoResolved $ find (\TxInInfo{txInInfoOutRef} -> txOutRef == txInInfoOutRef) (txInfoInputs txInfo)
 
         -- `ownValue` is the value associated with `txOutRef`, excluding Ada.
-        _ownValue :: Value
-        _ownValue = txOutValue refUtxo
+        ownValue :: Value
+        ownValue = txOutValue refUtxo
 
+        -- 'newRefUtxo' is the newly create output that contains the state NFT. 
+        -- We look for an output with the same value, above we check that this output has the same Address as the old 'refUtxo'.
+        newRefUtxo :: TxOut
+        newRefUtxo = maybe (error ()) (\x->x) $ find (\TxOut{txOutValue}-> txOutValue == ownValue) (txInfoOutputs txInfo)
+
+        -- 'newRefDatumHash' is the datum hash of the newly create output that contains the state NFT.
+        -- Note that this script expects the datum as a hash, not an inline datum.
+        newRefDatumHash :: DatumHash
+        newRefDatumHash = fetchDatum newRefUtxo
+            where
+                fetchDatum :: TxOut -> DatumHash
+                fetchDatum TxOut{txOutDatum} = case txOutDatum of
+                    NoOutputDatum                   -> error ()
+                    OutputDatumHash d               -> d
+                    OutputDatum _                   -> error ()
+
+        -- 'newDatum' is the new datum (a BuiltinByteString) that represents the updated state.
+        newDatum :: BuiltinByteString
+        newDatum = maybe (error ()) convertDatum $ findDatum newRefDatumHash txInfo
+            where
+                convertDatum :: Datum -> BuiltinByteString
+                convertDatum datum = case fromBuiltinData (getDatum datum) of
+                    Just bs     -> bs
+                    Nothing     -> error ()
 
 
 {-# INLINABLE  mkWrappedStateScript #-}
