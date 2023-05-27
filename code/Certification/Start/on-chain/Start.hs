@@ -14,16 +14,17 @@ module Start where
 import           Plutus.V2.Ledger.Api           (BuiltinData (..), ScriptContext,CurrencySymbol, ScriptContext (..), TxOutRef, ScriptPurpose (..), TxInfo (..)
                                                 , Value (..), TokenName (..), UnsafeFromData (..), PubKeyHash (..), TxOut (..), DatumHash (..), Address (..),
                                                 Credential (..), ValidatorHash (..), TxInInfo (..), Redeemer (..), FromData (..), Datum (..))
-import           PlutusTx                       (compile, makeIsDataIndexed, CompiledCode)
-import           PlutusTx.Prelude               (Bool (..),BuiltinByteString,(&&),Integer, error, maybe, otherwise, ($), foldr, (<>), (==), find, isJust, Maybe (..), any)
-import           Utilities                      (wrapValidator, writeCodeToFile, wrapPolicy)
-import           Prelude                        (IO, Monoid (mempty))
-import qualified Plutus.MerkleTree              as MT
-import           PlutusTx.AssocMap              (Map, empty, member, lookup, delete, singleton, keys)
-import           Plutus.V2.Ledger.Contexts      (ownCurrencySymbol, txSignedBy, findDatum)
-import           Plutus.Crypto.Number.Serialize (i2osp)
 import           Plutus.V2.Ledger.Tx            (OutputDatum(..))
-import           Plutus.Data.Bits               (setBit, reverseBS)
+import           Plutus.V2.Ledger.Contexts      (ownCurrencySymbol, txSignedBy, findDatum)
+import           PlutusTx                       (compile, makeIsDataIndexed, CompiledCode)
+import           PlutusTx.Prelude               (Bool (..),BuiltinByteString,(&&),Integer, error, maybe, otherwise, ($), foldr, (<>), (==), find, isJust,
+                                                Maybe (..), any, lengthOfByteString, (*), (-), (/=), mempty)
+import           PlutusTx.AssocMap              (Map, empty, member, lookup, delete, singleton, keys)
+import qualified Plutus.MerkleTree              as MT
+import           Plutus.Crypto.Number.Serialize (i2osp)
+import           Plutus.Data.Bits               (setBit)
+import           Utilities                      (wrapValidator, writeCodeToFile, wrapPolicy)
+import           Prelude                        (IO)
 
 -- [General notes on this file]
 -- This file contains two plutus scripts, the minting logic of the thread token and the logic of the validator that locks the 
@@ -129,7 +130,6 @@ mkThreadPolicy params red ctx = case red of
                 fetchScriptHash TxOut{txOutAddress=Address (ScriptCredential (ValidatorHash h)) Nothing} = h
                 fetchScriptHash _ = error ()
 
-
 {-# INLINABLE  mkThreadWrapped #-}
 mkThreadWrapped :: BuiltinData -> BuiltinData -> BuiltinData -> ()
 mkThreadWrapped params = wrapPolicy $ mkThreadPolicy params'
@@ -144,23 +144,26 @@ saveThreadPolicy = writeCodeToFile "assets/start-policy.plutus" threadCode
 
 --------------------- The state validator -------------
 
-data MyRedeemer = SetBit Integer | Unlock 
--- Ensure Plutus data is indexed properly for the 'Redeemer' type.
+data MyRedeemer = SetBit | Unlock 
+-- Ensure Plutus data is indexed properly for the 'MyRedeemer' type.
 makeIsDataIndexed ''MyRedeemer [('SetBit,0),('Unlock,1)]
 
 {-# INLINABLE  mkStateScript #-}
 -- This script is parametrized over the currency symbol of the above minting policy.
 mkStateScript :: CurrencySymbol -> BuiltinByteString -> MyRedeemer -> ScriptContext -> Bool
 mkStateScript threadSymbol dtm red ctx = case red of
-    -- A participant can update 
-    SetBit n      -> checkStateUpdate n && checkStateAddress
+    -- A participant that is a member of the merkle tree can update the state if they mint their thread token in the same transaction.
+    SetBit  -> checkStateUpdate bitNumber && checkStateAddress
     -- In case all participants started their exam, the state utxo can be unlocked.
-    -- For two participants that is if datum = Ob11 (in BE notation that is a bytestring wiith one byte (00000011))
-    Unlock      -> dtm == i2osp 0b11
+    -- For two participants that is if datum = Ob11 (in BE notation that is a bytestring with one byte (00000011))
+    -- given that these two particpants get assigned the last two bits as their index in the merkle tree
+    Unlock  -> dtm == i2osp 0b11
     where
+        -- Checks that the state is updated correctly, that is one bit is set from 0 to 1, and its index is part of the merkle tree. 
         checkStateUpdate :: Integer -> Bool
-        checkStateUpdate n = newDatum == reverseBS (setBit dtm n)
+        checkStateUpdate n = newDatum == setBit dtm (lengthOfByteString dtm * 8 - 1 - n) && newDatum /= dtm
 
+        -- Checks that the utxo that holds the state, never leaves its current address.
         checkStateAddress :: Bool 
         checkStateAddress = txOutAddress refUtxo == txOutAddress newRefUtxo
 
@@ -171,12 +174,15 @@ mkStateScript threadSymbol dtm red ctx = case red of
         txInfo = scriptContextTxInfo ctx
 
         -- 'mintRedeemer' is the redeemer of the thread token minting policy that is defined above.
+        -- OPEN QUESTION: Can anyone inject a script purpose + redeemer in this map? 
+        -- Or is it strictly constructed by the nodes that validate the network?
+        -- The datum hash / datum map in the context is injectable.
         mintRedeemer :: Redeemer
         mintRedeemer = maybe (error ()) (\x -> x) (lookup (Minting threadSymbol) (txInfoRedeemers txInfo))
 
         -- 'bitNumber' is the bit number that needs to be flipt according to the merkle proof in the above minting script.
-        _bitNumber :: Integer
-        _bitNumber = case fromBuiltinData (getRedeemer mintRedeemer) of
+        bitNumber :: Integer
+        bitNumber = case fromBuiltinData (getRedeemer mintRedeemer) of
           Just (Mint _ _ n) -> n
           Just Burn         -> error ()
           Nothing           -> error ()
@@ -221,7 +227,6 @@ mkStateScript threadSymbol dtm red ctx = case red of
                 convertDatum datum = case fromBuiltinData (getDatum datum) of
                     Just bs     -> bs
                     Nothing     -> error ()
-
 
 {-# INLINABLE  mkWrappedStateScript #-}
 mkWrappedStateScript :: BuiltinData -> BuiltinData -> BuiltinData -> BuiltinData -> ()
