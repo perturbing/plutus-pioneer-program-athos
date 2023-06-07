@@ -35,5 +35,7 @@ library
   import:               common-all
   hs-source-dirs:       Mint/on-chain
                         Start/on-chain
+                        Validator
   exposed-modules:      Mint
                         Start
+                        Validator
