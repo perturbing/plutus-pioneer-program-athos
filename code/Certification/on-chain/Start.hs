@@ -8,7 +8,6 @@
 {-# HLINT ignore "Use id" #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
-
 module Start where
 
 import           Plutus.V2.Ledger.Api           (BuiltinData (..), ScriptContext,CurrencySymbol, ScriptContext (..), TxOutRef, ScriptPurpose (..), TxInfo (..)
@@ -18,7 +17,7 @@ import           Plutus.V2.Ledger.Tx            (OutputDatum(..))
 import           Plutus.V2.Ledger.Contexts      (ownCurrencySymbol, txSignedBy, findDatum)
 import           PlutusTx                       (compile, makeIsDataIndexed, CompiledCode)
 import           PlutusTx.Prelude               (Bool (..),BuiltinByteString,(&&),Integer, error, maybe, otherwise, ($), foldr, (<>), (==), find, isJust,
-                                                Maybe (..), any, lengthOfByteString, (*), (-), (/=), mempty)
+                                                Maybe (..), any, (-), (/=), mempty, lengthOfByteString, (*))
 import           PlutusTx.AssocMap              (Map, empty, member, lookup, delete, singleton, keys)
 import qualified Plutus.MerkleTree              as MT
 import           Plutus.Crypto.Number.Serialize (i2osp)
@@ -44,16 +43,16 @@ splitValue symbol val
 ----------------------------------- MINTING-VALIDATOR ---------------------------------------------
 -- TODO: General note on what this minting policy does.
 
--- | 'Parameters' data type holds all the necessary information needed for setting up the minting policy.
-data Parameters = Parameters {
+-- | 'ThreadParameters' data type holds all the necessary information needed for setting up the minting policy.
+data ThreadParameters = ThreadParameters {
                     -- | the Merkle root of the participant data. A member is the concatenation of a public key hash and a integer.
                     merkleRoot          :: MT.Hash
     ,
                     -- | the currency symbol of the tokens that are locked with the state.
                     stateSymbol         :: CurrencySymbol
 }
--- Ensure Plutus data indexing is fixed properly for the 'Parameters' type.
-makeIsDataIndexed ''Parameters [('Parameters,0)]
+-- Ensure Plutus data indexing is fixed properly for the 'ThreadParameters' type.
+makeIsDataIndexed ''ThreadParameters [('ThreadParameters,0)]
 
 -- | Under this minting policy, a participant can mint their thread token.
 -- | Minting requires a Merkle membership proof, their public key hash, and their participant number.
@@ -65,7 +64,7 @@ makeIsDataIndexed ''MintRedeemer [('Mint,0),('Burn,1)]
 
 -- | The core minting policy of the Certificate.
 {-# INLINABLE mkThreadPolicy #-}
-mkThreadPolicy :: Parameters -> MintRedeemer -> ScriptContext -> Bool
+mkThreadPolicy :: ThreadParameters -> MintRedeemer -> ScriptContext -> Bool
 mkThreadPolicy params red ctx = case red of
     -- Minting is possible if all these conditions are met.
     Mint proof pkh n        -> foldr (&&) (txSignedBy txInfo (PubKeyHash pkh)) [checkMember proof pkh n, checkMintValue pkh, checkStateNFT]
@@ -144,20 +143,31 @@ saveThreadPolicy = writeCodeToFile "assets/start-policy.plutus" threadCode
 
 --------------------- The state validator -------------
 
+-- | 'StateParameters' data type holds all the necessary information needed for setting up the minting policy.
+data StateParameters = StateParameters {
+                    -- | the currency symbol of the thread symbol minting policy defined above.
+                    threadSymbol        :: CurrencySymbol
+    ,
+                    -- | the currency symbol of the tokens that are locked with the state.
+                    finalState          :: BuiltinByteString
+}
+-- Ensure Plutus data indexing is fixed properly for the 'StateParameters' type.
+makeIsDataIndexed ''StateParameters [('StateParameters,0)]
+
 data MyRedeemer = SetBit | Unlock 
 -- Ensure Plutus data is indexed properly for the 'MyRedeemer' type.
 makeIsDataIndexed ''MyRedeemer [('SetBit,0),('Unlock,1)]
 
 {-# INLINABLE  mkStateScript #-}
 -- This script is parametrized over the currency symbol of the above minting policy.
-mkStateScript :: CurrencySymbol -> BuiltinByteString -> MyRedeemer -> ScriptContext -> Bool
-mkStateScript threadSymbol dtm red ctx = case red of
+mkStateScript :: StateParameters -> BuiltinByteString -> MyRedeemer -> ScriptContext -> Bool
+mkStateScript params dtm red ctx = case red of
     -- A participant that is a member of the merkle tree can update the state if they mint their thread token in the same transaction.
     SetBit  -> checkStateUpdate bitNumber && checkStateAddress
     -- In case all participants started their exam, the state utxo can be unlocked.
     -- For two participants that is if datum = Ob11 (in BE notation that is a bytestring with one byte (00000011))
     -- given that these two particpants get assigned the last two bits as their index in the merkle tree
-    Unlock  -> dtm == i2osp 0b11
+    Unlock  -> dtm == finalState params
     where
         -- Checks that the state is updated correctly, that is one bit is set from 0 to 1, and its index is part of the merkle tree. 
         checkStateUpdate :: Integer -> Bool
@@ -174,11 +184,8 @@ mkStateScript threadSymbol dtm red ctx = case red of
         txInfo = scriptContextTxInfo ctx
 
         -- 'mintRedeemer' is the redeemer of the thread token minting policy that is defined above.
-        -- OPEN QUESTION: Can anyone inject a script purpose + redeemer in this map? 
-        -- Or is it strictly constructed by the nodes that validate the network?
-        -- The datum hash / datum map in the context is injectable.
         mintRedeemer :: Redeemer
-        mintRedeemer = maybe (error ()) (\x -> x) (lookup (Minting threadSymbol) (txInfoRedeemers txInfo))
+        mintRedeemer = maybe (error ()) (\x -> x) (lookup (Minting (threadSymbol params)) (txInfoRedeemers txInfo))
 
         -- 'bitNumber' is the bit number that needs to be flipt according to the merkle proof in the above minting script.
         bitNumber :: Integer

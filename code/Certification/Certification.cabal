@@ -33,9 +33,9 @@ common common-all
 
 library
   import:               common-all
-  hs-source-dirs:       Mint/on-chain
-                        Start/on-chain
+  hs-source-dirs:       on-chain
                         Validator
   exposed-modules:      Mint
                         Start
+                        Testing
                         Validator

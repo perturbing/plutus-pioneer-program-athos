@@ -31,7 +31,7 @@ import           Prelude                    (IO, show)
 
 {-# INLINABLE validator #-}
 validator :: PubKeyHash -> BuiltinData -> BuiltinData -> ScriptContext -> Bool
-validator pkh dtm rdm ctx = -- Paste your validator logic here
+validator pkh dtm rdm ctx = True -- Paste your validator logic here
 
 myPkh = PubKeyHash . toBuiltin . bytesFromHex $ "your PubKeyHash here"
 myPkh :: PubKeyHash

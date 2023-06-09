@@ -10,8 +10,7 @@
 
 module Mint where
 
-import           Plutus.V2.Ledger.Api       (BuiltinData, ScriptContext,CurrencySymbol,
-                                            MintingPolicy, mkMintingPolicyScript, mkValidatorScript,
+import           Plutus.V2.Ledger.Api       (BuiltinData, ScriptContext,CurrencySymbol, mkValidatorScript,
                                             Validator, ScriptContext (..), TxInfo (..),
                                             TxInInfo (..), TokenName (..), Value (..),TxOut ,txOutValue,
                                             txOutAddress, txOutDatum, OutputDatum (..), DatumHash (..), TxOut (..),
@@ -25,7 +24,7 @@ import           PlutusTx.Eq                (Eq(..) )
 import           PlutusTx.Prelude           (Bool (..), BuiltinByteString, ($), (&&), Integer, error,
                                             otherwise, (<>), (<$>), find, foldr,
                                             map, elem, negate, null)
-import           Utilities                  (wrapPolicy, writeCodeToFile,writePolicyToFile, currencySymbol,
+import           Utilities                  (wrapPolicy, writeCodeToFile,
                                             writeValidatorToFile, wrapValidator)
 import           Prelude                    (IO)
 import qualified Plutus.MerkleTree          as MT
@@ -143,7 +142,6 @@ mkNFTPolicy params red ctx = case red of
                     OutputDatumHash (DatumHash h)   -> if isJust (findDatum (DatumHash h) txInfo) then h else error ()
                     OutputDatum _                   -> error ()
 
-
 {-# INLINABLE  mkNFTWrapped #-}
 mkNFTWrapped :: BuiltinData -> BuiltinData -> BuiltinData -> ()
 mkNFTWrapped params = wrapPolicy $ mkNFTPolicy params'
@@ -155,29 +153,6 @@ nftCode = $$(compile [|| mkNFTWrapped ||])
 
 saveNFTPolicy :: IO ()
 saveNFTPolicy = writeCodeToFile "assets/certificate-policy.plutus" nftCode
-
----------------------- The never fail minting policy ----------------------
--- Since the thread minting policy is not written yet, and we do want to test out the above script
--- the always true minting policy is currently used as a standin for the soon to follow real thread policy.
--- TO DO: Remove this once the "Start" exam functionality is done.
-
-{-# INLINABLE  mkFree #-}
-mkFree :: () -> ScriptContext -> Bool
-mkFree _red _ctx = True
-
-{-# INLINABLE  mkWrappedFree #-}
-mkWrappedFree :: BuiltinData -> BuiltinData -> ()
-mkWrappedFree = wrapPolicy mkFree
-
-freePolicy :: MintingPolicy
-freePolicy = mkMintingPolicyScript $$(compile [|| mkWrappedFree ||])
-
-saveFreePolicy :: IO ()
-saveFreePolicy = writePolicyToFile "assets/alwaysTrue-policy.plutus" freePolicy
-
-freeCurrencySymbol :: CurrencySymbol
-freeCurrencySymbol = currencySymbol freePolicy
-
 
 --------------------- The locing validator -------------
 -- This section details the logic for the locking validator. This mechanism holds the reference token of the PPP NFT as described in CIP 68.
@@ -223,7 +198,6 @@ mkLockingScript _dat _red ctx = foldr (&&) True $ map (\(x,y,z) -> elem (x,y, ne
         -- `ownValue` is the value associated with `txOutRef`, excluding Ada.
         ownValue :: Value
         ownValue = Value {getValue = delete adaSymbol (getValue (txOutValue refUtxo))}
-
 
 {-# INLINABLE  mkWrappedLockingScript #-}
 mkWrappedLockingScript :: BuiltinData -> BuiltinData -> BuiltinData -> ()

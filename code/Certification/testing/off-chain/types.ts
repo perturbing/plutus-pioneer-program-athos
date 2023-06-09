@@ -57,9 +57,25 @@ export const Address = L.Data.Object({
 export type Address = L.Data.Static<typeof Address>;
 
 // The type of the Parameters for the thread policy
-export const Parameters = L.Data.Object({
+export const ThreadParameters = L.Data.Object({
     merkleRoot: Hash,
     stateSymbol: CurrencySymbol,
 });
-export type Parameters = L.Data.Static<typeof Parameters>;
+export type ThreadParameters = L.Data.Static<typeof ThreadParameters>;
 
+// The type of the Parameters for the thread policy
+export const StateParameters = L.Data.Object({
+    threadSymbol: CurrencySymbol,
+    finalState: L.Data.Bytes()
+});
+export type StateParameters = L.Data.Static<typeof StateParameters>;
+
+// The type of the Parameters for the NFT policy
+export const Parameters = L.Data.Object({
+    merkleRoot: Hash,
+    prefixNFT: Prefix,
+    prefixRef: Prefix,
+    threadSymbol: CurrencySymbol,
+    lockAddress: Address
+});
+export type Parameters = L.Data.Static<typeof Parameters>;

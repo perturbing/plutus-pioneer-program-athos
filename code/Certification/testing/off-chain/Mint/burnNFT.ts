@@ -1,8 +1,8 @@
 import * as L from "https://deno.land/x/lucid@0.10.1/mod.ts";
-import * as Types from "./types.ts"
-import { secretSeed } from "./seed.ts";
-import genericMetadata from "../../Data/generic_metadata.json" assert { type: "json" };
-import merkleData from "../../Data/merkleData.ts";
+import * as Types from "../types.ts";
+import { secretSeed } from "../seed.ts";
+import genericMetadata from "../../../data/generic-NFT-metadata.json" assert { type: "json" };
+import merkleData from "../../../data/mint-merkleTree-Data.ts";
 import * as mod from "https://deno.land/std@0.182.0/crypto/mod.ts";
 import {decode} from "https://deno.land/std/encoding/hex.ts";
 
@@ -29,7 +29,7 @@ lucid.selectWalletFromSeed(secretSeed);
 const addr: L.Address = await lucid.wallet.address();
 
 // define here your name and public key hash
-const particpantsName: string = "Thomas"
+const particpantsName: string = "name1"
 const pkh: string = L.getAddressDetails(addr).paymentCredential.hash;
 
 // a helper function that reads an unparametrized plutus script
@@ -109,41 +109,27 @@ async function readNFTPolicy(): Promise<L.MintingPolicy> {
 }
 const mintingScriptNFT: L.MintingPolicy = await readNFTPolicy();
 const policyIdNFT: L.PolicyId = lucid.utils.mintingPolicyToId(mintingScriptNFT);
-console.log("PolicyID: "+policyIdNFT)
 
-async function mintPKHToken(): Promise<L.TxHash> {
-  const tkn: L.Unit = L.toUnit(policyIdFree,pkh);
-  const tx = await lucid
-    .newTx()
-    .mintAssets({ [tkn]: 1n}, L.Data.void())
-    .attachMintingPolicy(mintingScriptFree)
-    .complete();
-  const signedTx = await tx.sign().complete();
- 
-  return signedTx.submit();
-}
-//console.log(await mintPKHToken());
-
-const Redeemer = L.Data.Object({proof: Types.MerkleProof})
-type Redeemer = L.Data.Static<typeof Redeemer>
-
-const redeemer: Redeemer = {proof: merkleProof1}
-
-async function mint(): Promise<L.TxHash> {
-    const threadTkn: L.Unit = L.toUnit(policyIdFree,pkh);
+async function burn(): Promise<L.TxHash> {
     const userTkn: L.Unit = L.toUnit(policyIdNFT,pkh,222);
-    const refTkn: L.Unit = L.toUnit(policyIdNFT,pkh,100)
-    const tx = await lucid
+    const refTkn: L.Unit = L.toUnit(policyIdNFT,pkh,100);
+    const utxoAtScript: L.UTxO[] = await lucid.utxosAt(lockingAddress);
+    const ourUTxO: L.UTxO[] = utxoAtScript.filter((utxo) => utxo.assets[refTkn] == 1n);
+
+    if (ourUTxO && ourUTxO.length > 0) {
+      const tx = await lucid
       .newTx()
-      .mintAssets({ [userTkn]: 1n, [refTkn]: 1n},  L.Data.to<Redeemer>(redeemer,Redeemer))
+      .collectFrom(ourUTxO, L.Data.void())
+      .attachSpendingValidator(lockingValidator)
+      .mintAssets({ [userTkn]: -1n, [refTkn]: -1n},  L.Data.to(new L.Constr(1,[pkh])))
       .attachMintingPolicy(mintingScriptNFT)
-      .mintAssets({ [threadTkn]:-1n }, L.Data.void())
-      .attachMintingPolicy(mintingScriptFree)
-      .payToContract(lockingAddress, L.Data.to(new L.Constr(0,[L.Data.fromJson(genImageParticipant(particpantsName))])),{[refTkn]: 1n})
-      .addSignerKey(pkh)
       .complete();
     const signedTx = await tx.sign().complete();
    
     return signedTx.submit();
+    }
+    else return "No UTxO's found that can be burned"
+
+
 }
-//console.log(await mint())
+console.log(await burn())
