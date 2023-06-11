@@ -3,6 +3,8 @@ import * as Types from "../types.ts";
 import { secretSeed } from "../seed.ts";
 import genericMetadata from "../../../data/generic-NFT-metadata.json" assert { type: "json" };
 import merkleData from "../../../data/mint-merkleTree-Data.ts";
+import setupData from "../../../data/setupData.ts";
+
 import * as mod from "https://deno.land/std@0.182.0/crypto/mod.ts";
 import {decode} from "https://deno.land/std/encoding/hex.ts";
 
@@ -41,9 +43,8 @@ async function readScript(name: string): Promise<L.MintingPolicy> {
     }
 }
 
-// import always true minting policy (replace for threadtoken policy)
-const mintingScriptFree: L.MintingPolicy = await readScript("alwaysTrue-policy.plutus");
-const policyIdFree: L.PolicyId = lucid.utils.mintingPolicyToId(mintingScriptFree);
+const threadScript: L.MintingPolicy = setupData.threadScript;
+const threadPol: L.PolicyId = lucid.utils.mintingPolicyToId(threadScript);
 
 // import the locking validator (this locks the reference token)
 const lockingValidator: L.SpendingValidator = await readScript("lockingValidator.plutus");
@@ -70,59 +71,23 @@ async function participantNumberToMerkleData(name:string,pubkeyhash:string): Pro
 const metadataDatum = await participantNumberToMerkleData(particpantsName,pkh);
 
 // merkle tree stuff
-const dataUint = merkleData.map((x) => L.fromHex(x));
-const merkleTree = new L.MerkleTree(dataUint);
-const merkleRoot: Types.Hash = { hash: L.toHex(merkleTree.rootHash())};
+const mintDataUint = merkleData.map((x) => L.fromHex(x));
+const mintMerkleTree = new L.MerkleTree(mintDataUint);
+const mintMerkleRoot: Types.Hash = { hash: L.toHex(mintMerkleTree.rootHash())};
 
 // a test member and proof
 // retrieve the index of the user in the list of merkle tree data.
 const n = merkleData.indexOf(metadataDatum)
 // the following function will fail if n is -1 (the provided pkh and name are not in the merkletree)
-const merkleProof1 : Types.MerkleProof = merkleTree.getProof(dataUint[n]).map((p) =>
+const merkleProof1 : Types.MerkleProof = mintMerkleTree.getProof(mintDataUint[n]).map((p) =>
   p.left
     ? { Left: [{ hash: L.toHex(p.left) }] }
     : { Right: [{ hash: L.toHex(p.right!) }] }
 )
 
-// setup parameters
-const prefixNFT: Types.Prefix = L.toLabel(222);
-const prefixRef: Types.Prefix = L.toLabel(100);
-const addrAlwaysFail: Types.Address = {addressCredential: { ScriptCredential: [lockingAddressDetails.paymentCredential.hash] }, addressStakingCredential: null};
-
-const parameters: Types.Parameters = {
-    merkleRoot: merkleRoot,
-    prefixNFT: prefixNFT,
-    prefixRef: prefixRef,
-    threadSymbol: policyIdFree,
-    lockAddress: addrAlwaysFail
-}
-
-// import NFT minting policy and apply above parameters
-const Params = L.Data.Tuple([Types.Parameters]);
-type Params = L.Data.Static<typeof Params>;
-async function readNFTPolicy(): Promise<L.MintingPolicy> {
-  const script = JSON.parse(await Deno.readTextFile("assets/certificate-policy.plutus"))
-  return {
-    type: "PlutusV2",
-    script: L.applyParamsToScript<Params>(script.cborHex,[parameters],Params)
-  }
-}
-const mintingScriptNFT: L.MintingPolicy = await readNFTPolicy();
+const mintingScriptNFT: L.MintingPolicy = setupData.mintingScriptNFT;
 const policyIdNFT: L.PolicyId = lucid.utils.mintingPolicyToId(mintingScriptNFT);
 console.log("PolicyID: "+policyIdNFT)
-
-async function mintPKHToken(): Promise<L.TxHash> {
-  const tkn: L.Unit = L.toUnit(policyIdFree,pkh);
-  const tx = await lucid
-    .newTx()
-    .mintAssets({ [tkn]: 1n}, L.Data.void())
-    .attachMintingPolicy(mintingScriptFree)
-    .complete();
-  const signedTx = await tx.sign().complete();
- 
-  return signedTx.submit();
-}
-// console.log(await mintPKHToken());
 
 const Redeemer = L.Data.Object({proof: Types.MerkleProof})
 type Redeemer = L.Data.Static<typeof Redeemer>
@@ -130,15 +95,15 @@ type Redeemer = L.Data.Static<typeof Redeemer>
 const redeemer: Redeemer = {proof: merkleProof1}
 
 async function mint(): Promise<L.TxHash> {
-    const threadTkn: L.Unit = L.toUnit(policyIdFree,pkh);
+    const threadTkn: L.Unit = L.toUnit(threadPol,pkh);
     const userTkn: L.Unit = L.toUnit(policyIdNFT,pkh,222);
     const refTkn: L.Unit = L.toUnit(policyIdNFT,pkh,100)
     const tx = await lucid
       .newTx()
       .mintAssets({ [userTkn]: 1n, [refTkn]: 1n},  L.Data.to<Redeemer>(redeemer,Redeemer))
       .attachMintingPolicy(mintingScriptNFT)
-      .mintAssets({ [threadTkn]:-1n }, L.Data.void())
-      .attachMintingPolicy(mintingScriptFree)
+      .mintAssets({ [threadTkn]:-1n }, L.Data.to(new L.Constr(1,[])))
+      .attachMintingPolicy(threadScript)
       .payToContract(lockingAddress, L.Data.to(new L.Constr(0,[L.Data.fromJson(genImageParticipant(particpantsName))])),{[refTkn]: 1n})
       .addSignerKey(pkh)
       .complete();
@@ -146,4 +111,4 @@ async function mint(): Promise<L.TxHash> {
    
     return signedTx.submit();
 }
-// console.log(await mint())
+console.log(await mint())
