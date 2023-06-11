@@ -23,7 +23,7 @@ const addr: L.Address = await lucid.wallet.address();
 
 // define here your public key hash, participant id and exam script cbor here
 const pkh: string = L.getAddressDetails(addr).paymentCredential.hash;
-const participantId: number = 1;
+const participantId: number = 0;
 const scriptCBOR = "49480100002221200101"
 // the validator where the participant should lock their thread token
 const lockingValidatorParticipant: L.SpendingValidator = {
@@ -58,6 +58,7 @@ const Redeemer = L.Data.Object({
 type Redeemer = L.Data.Static<typeof Redeemer>
 
 const redeemer: Redeemer = {proof: merkleProof, pkh: pkh, n: BigInt(participantId)}
+
 async function mint(): Promise<L.TxHash> {
   const stateTkn: L.Unit = setupData.stateToken;
   const utxoAtScript: L.UTxO[] = await lucid.utxosAt(stateAddress);

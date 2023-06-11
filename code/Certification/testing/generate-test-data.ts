@@ -1,18 +1,6 @@
 import * as L from "https://deno.land/x/lucid@0.10.1/mod.ts";
 import metadata from "../data/generic-NFT-metadata.json" assert { type: "json" };
 import participants from "./participants.json" assert { type: "json" };
-import * as mod from "https://deno.land/std@0.182.0/crypto/mod.ts";
-import {decode} from "https://deno.land/std/encoding/hex.ts";
-
-// cardano uses blake2b hash function for plutus data
-async function blake2bHash(input:string): Promise<string> {
-  const digest = await mod.crypto.subtle.digest(
-    "BLAKE2B-256",
-    decode(new TextEncoder().encode(input))
-  );
-  const string = mod.toHashString(digest)
-  return string
-}
 
 const lucid = await L.Lucid.new(
     undefined,
@@ -33,7 +21,7 @@ function genImageParticipant(name:string) {
 // a function that generates a merkle tree entry for a participant (given pkh and name)
 async function participantToMintMerkleTreeData(name:string,pubkeyhash:string): Promise<string> {
     const plutusMetaData = L.Data.fromJson(genImageParticipant(name));
-    const datumHash = await blake2bHash(L.Data.to(new L.Constr(0,[plutusMetaData])));
+    const datumHash = L.toHex(L.C.hash_blake2b256(L.fromHex(L.Data.to(new L.Constr(0,[plutusMetaData])))));
     return pubkeyhash+datumHash;
 }
 
@@ -73,7 +61,7 @@ function intToUint8Array(num: number): Uint8Array {
 
 // a function that generates a merkle tree entry for a participant (given pkh, id number, script cbor)
 async function participantToStartMerkleTreeData(pubkeyhash:string,id:number,cbor:string): Promise<string> {
-    const datumHash = await blake2bHash(L.Data.to(pubkeyhash));
+    const datumHash = L.toHex(L.C.hash_blake2b256(L.fromHex(L.Data.to(pubkeyhash))));
     const examValidator: L.SpendingValidator = {
         type: "PlutusV2",
         script: cbor

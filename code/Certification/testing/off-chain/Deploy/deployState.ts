@@ -1,6 +1,4 @@
 import * as L from "https://deno.land/x/lucid@0.10.1/mod.ts";
-import * as Types from "../types.ts";
-import merkleData from "../../../data/start-merkleTree-Data.ts";
 import setupData from "../../../data/setupData.ts";
 import { secretSeed } from "../seed.ts";
 
@@ -42,7 +40,7 @@ async function initState(): Promise<L.TxHash> {
     const tx = await lucid
       .newTx()
       .mintAssets({ [tkn]: 1n}, L.Data.void())
-      .payToContract(stateAddress, L.Data.to("00".repeat(1000)),{[tkn]: 1n})
+      .payToContract(stateAddress, L.Data.to("00".repeat(1001)),{[tkn]: 1n})
       .attachMintingPolicy(mintingScriptFree)
       .complete();
     const signedTx = await tx.sign().complete();

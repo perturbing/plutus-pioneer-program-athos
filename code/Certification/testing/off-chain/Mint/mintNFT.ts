@@ -5,19 +5,6 @@ import genericMetadata from "../../../data/generic-NFT-metadata.json" assert { t
 import merkleData from "../../../data/mint-merkleTree-Data.ts";
 import setupData from "../../../data/setupData.ts";
 
-import * as mod from "https://deno.land/std@0.182.0/crypto/mod.ts";
-import {decode} from "https://deno.land/std/encoding/hex.ts";
-
-// cardano uses blake2b hash function for plutus data
-async function blake2bHash(input:string): Promise<string> {
-  const digest = await mod.crypto.subtle.digest(
-    "BLAKE2B-256",
-    decode(new TextEncoder().encode(input))
-  );
-  const string = mod.toHashString(digest)
-  return string
-}
-
 // set blockfrost endpoint
 const lucid = await L.Lucid.new(
   new L.Blockfrost(
@@ -31,7 +18,7 @@ lucid.selectWalletFromSeed(secretSeed);
 const addr: L.Address = await lucid.wallet.address();
 
 // define here your name and public key hash
-const particpantsName: string = "name1"
+const particpantsName: string = "Name0"
 const pkh: string = L.getAddressDetails(addr).paymentCredential.hash;
 
 // a helper function that reads an unparametrized plutus script
@@ -49,7 +36,6 @@ const threadPol: L.PolicyId = lucid.utils.mintingPolicyToId(threadScript);
 // import the locking validator (this locks the reference token)
 const lockingValidator: L.SpendingValidator = await readScript("lockingValidator.plutus");
 const lockingAddress: L.Address = lucid.utils.validatorToAddress(lockingValidator);
-const lockingAddressDetails: L.AddressDetails = L.getAddressDetails(lockingAddress);
 
 // generate NFT metadatum for participant
 
@@ -64,7 +50,7 @@ function genImageParticipant(name:string) {
 
 async function participantNumberToMerkleData(name:string,pubkeyhash:string): Promise<string> {
   const plutusMetaData = L.Data.fromJson(genImageParticipant(name));
-  const datumHash = await blake2bHash(L.Data.to(new L.Constr(0,[plutusMetaData])));
+  const datumHash = L.toHex(L.C.hash_blake2b256(L.fromHex(L.Data.to(new L.Constr(0,[plutusMetaData])))))
   return pubkeyhash+datumHash;
 }
 // nft datum
@@ -73,7 +59,6 @@ const metadataDatum = await participantNumberToMerkleData(particpantsName,pkh);
 // merkle tree stuff
 const mintDataUint = merkleData.map((x) => L.fromHex(x));
 const mintMerkleTree = new L.MerkleTree(mintDataUint);
-const mintMerkleRoot: Types.Hash = { hash: L.toHex(mintMerkleTree.rootHash())};
 
 // a test member and proof
 // retrieve the index of the user in the list of merkle tree data.

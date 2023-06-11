@@ -50,7 +50,7 @@ console.log("Thread policyID: "+threadPol)
 // setup the state parameter from the thread minting policy and final state
 const stateParameters: Types.StateParameters = {
     threadSymbol: threadPol,
-    finalState: "ff".repeat(1000)
+    finalState: "ff".repeat(1001)
 }
 
 const StateParams = L.Data.Tuple([Types.StateParameters]);
@@ -101,10 +101,10 @@ async function readNFTPolicy(): Promise<L.MintingPolicy> {
 }
 const mintingScriptNFT: L.MintingPolicy = await readNFTPolicy();
 const policyIdNFT: L.PolicyId = lucid.utils.mintingPolicyToId(mintingScriptNFT);
-console.log("PolicyID: "+policyIdNFT)
+console.log("NFT PolicyID: "+policyIdNFT)
 
 const setup = {
-  stateToken: L.toUnit(policyIdFree, L.fromText("PPP Cert State tkn")),
+  stateToken: L.toUnit(policyIdFree, L.fromText("PPP Cert State token")),
   threadScript: threadScript,
   stateValidator: stateValidator,
   mintingScriptNFT: mintingScriptNFT 

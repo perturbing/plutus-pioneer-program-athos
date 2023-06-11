@@ -25,7 +25,6 @@ async function readScript(name: string): Promise<L.MintingPolicy> {
 
 // import always true minting policy (replace this for a real NFT policy for the state token)
 const mintingScriptFree: L.MintingPolicy = await readScript("alwaysTrue-policy.plutus");
-const policyIdFree: L.PolicyId = lucid.utils.mintingPolicyToId(mintingScriptFree);
 
 const stateValidator: L.SpendingValidator = setupData.stateValidator;
 const stateAddress: L.Address = lucid.utils.validatorToAddress(stateValidator);
