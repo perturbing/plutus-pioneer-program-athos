@@ -6,47 +6,6 @@ import merkleData from "../../../data/start-merkleTree-Data.ts";
 import * as mod from "https://deno.land/std@0.182.0/crypto/mod.ts";
 import {decode} from "https://deno.land/std/encoding/hex.ts";
 
-// function flipBit(hexStr: string, bitIndexLE: number): string {
-//   // Convert the hex string to a binary string
-//   let binaryStr = parseInt(hexStr, 16).toString(2).padStart(hexStr.length * 4, '0');
-//   let bitIndex = hexStr.length*4 - bitIndexLE - 1
-
-//   // Check if the bit at the specified index is set
-//   if (binaryStr[bitIndex] === '1') {
-//       // If it is, clear it
-//       binaryStr = binaryStr.substring(0, bitIndex) + '0' + binaryStr.substring(bitIndex + 1);
-//   } else {
-//       // If it isn't, set it
-//       binaryStr = binaryStr.substring(0, bitIndex) + '1' + binaryStr.substring(bitIndex + 1);
-//   }
-
-//   // Convert the binary string back to a hex string, keeping leading zeroes
-//   let hexResult = parseInt(binaryStr, 2).toString(16).padStart(hexStr.length, '0');
-
-//   return hexResult;
-// }
-
-function flipBit(hexStr: string, bitIndex: number): string {
-  // Parse the hex string as a BigInt
-  let num = BigInt('0x' + hexStr);
-
-  // Create a mask with a 1 at the desired position
-  let mask = BigInt(1) << BigInt(bitIndex);
-
-  // XOR the number with the mask to flip the bit at the desired position
-  let result = num ^ mask;
-
-  // Convert the result back to a hex string
-  let resultStr = result.toString(16);
-
-  // Pad the result with leading zeros to match the original string length
-  while (resultStr.length < hexStr.length) {
-      resultStr = '0' + resultStr;
-  }
-
-  return resultStr;
-}
-
 // cardano uses blake2b hash function for plutus data
 async function blake2bHash(input:string): Promise<string> {
   const digest = await mod.crypto.subtle.digest(
@@ -55,6 +14,11 @@ async function blake2bHash(input:string): Promise<string> {
   );
   const string = mod.toHashString(digest)
   return string
+}
+
+function setBit(hexStr: string, bitIndex: number): string {
+  const newStr = ((BigInt(1) << BigInt(bitIndex)) | BigInt("0x"+hexStr)).toString(16);
+  return newStr.padStart(hexStr.length,"0")
 }
 
 // set blockfrost endpoint
@@ -71,7 +35,7 @@ const addr: L.Address = await lucid.wallet.address();
 
 // define here your public key hash, participant id and exam script cbor here
 const pkh: string = L.getAddressDetails(addr).paymentCredential.hash;
-const participantId: number = 2001;
+const participantId: number = 7997;
 const scriptCBOR = "49480100002221200101"
 // the validator where the participant should lock their thread token
 const lockingValidatorParticipant: L.SpendingValidator = {
@@ -127,7 +91,7 @@ const threadPol: L.PolicyId = lucid.utils.mintingPolicyToId(threadScript);
 
 const stateParameters: Types.StateParameters = {
   threadSymbol: threadPol,
-  finalState: "f".repeat(1000)
+  finalState: "ff".repeat(1000)
 }
 
 const StateParams = L.Data.Tuple([Types.StateParameters]);
@@ -159,7 +123,7 @@ async function mint(): Promise<L.TxHash> {
   if (ourUTxO && ourUTxO.length > 0) {
     const stateDatum = await lucid.provider.getDatum(ourUTxO[0].datumHash)
     console.log("old state: "+L.Data.from(stateDatum))
-    const newState = flipBit(L.Data.from(stateDatum),participantId)
+    const newState = setBit(L.Data.from(stateDatum),participantId)
     console.log("new state: "+ newState)
 
     const tx = await lucid

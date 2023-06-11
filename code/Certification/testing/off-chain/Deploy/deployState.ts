@@ -57,7 +57,7 @@ console.log("Thread policyID: "+threadPol)
 // setup the state parameter from the thread minting policy and final state
 const stateParameters: Types.StateParameters = {
     threadSymbol: threadPol,
-    finalState: "f".repeat(1000)
+    finalState: "ff".repeat(1000)
 }
 
 const StateParams = L.Data.Tuple([Types.StateParameters]);
@@ -78,7 +78,7 @@ async function initState(): Promise<L.TxHash> {
     const tx = await lucid
       .newTx()
       .mintAssets({ [tkn]: 1n}, L.Data.void())
-      .payToContract(stateAddress, L.Data.to("0".repeat(1000)),{[tkn]: 1n})
+      .payToContract(stateAddress, L.Data.to("00".repeat(1000)),{[tkn]: 1n})
       .attachMintingPolicy(mintingScriptFree)
       .complete();
     const signedTx = await tx.sign().complete();

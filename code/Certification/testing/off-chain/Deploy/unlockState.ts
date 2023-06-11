@@ -57,7 +57,7 @@ console.log("Thread policyID: "+threadPol)
 // setup the state parameter from the thread minting policy and final state
 const stateParameters: Types.StateParameters = {
     threadSymbol: threadPol,
-    finalState: "ff"
+    finalState: "ff".repeat(1000)
 }
 
 const StateParams = L.Data.Tuple([Types.StateParameters]);
