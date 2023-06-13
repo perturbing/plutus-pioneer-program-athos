@@ -37,5 +37,5 @@ library
                         Validator
   exposed-modules:      Mint
                         Start
-                        Testing
+                        StateNFT
                         Validator

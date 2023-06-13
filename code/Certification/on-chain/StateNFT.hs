@@ -6,34 +6,18 @@
 {-# LANGUAGE NamedFieldPuns    #-}
 
 
-module Testing where
+module StateNFT where
 
-import           Plutus.V2.Ledger.Api       (BuiltinData, ScriptContext,
-                                            MintingPolicy, mkMintingPolicyScript, mkValidatorScript,
+import           Plutus.V2.Ledger.Api       (BuiltinData, ScriptContext, mkValidatorScript,
                                             Validator, ScriptContext (..), TokenName, TxOutRef (..), TxInfo (..), unsafeFromBuiltinData, TxId (..), TxInInfo (..))
 import           PlutusTx                   (compile, CompiledCode)
 import           PlutusTx.Prelude           (Bool (..), ($), traceIfFalse, any, (==), (&&))
-import           Utilities                  (wrapPolicy, writePolicyToFile,
-                                            writeValidatorToFile, wrapValidator, writeCodeToFile)
+import           Utilities                  (wrapPolicy, writeValidatorToFile, wrapValidator, writeCodeToFile)
 import           Prelude                    (IO)
-import Plutus.V1.Ledger.Value (flattenValue)
+import           Plutus.V1.Ledger.Value     (flattenValue)
 
----------------------- The never fail minting policy and validator ----------------------
+---------------------- The never fail validator ----------------------
 -- Written for testing purposes, remove later
-
-{-# INLINABLE  mkFreePol #-}
-mkFreePol :: () -> ScriptContext -> Bool
-mkFreePol _red _ctx = True
-
-{-# INLINABLE  mkWrappedFreePol #-}
-mkWrappedFreePol :: BuiltinData -> BuiltinData -> ()
-mkWrappedFreePol = wrapPolicy mkFreePol
-
-freePolicyPol :: MintingPolicy
-freePolicyPol = mkMintingPolicyScript $$(compile [|| mkWrappedFreePol ||])
-
-saveFreePolicy :: IO ()
-saveFreePolicy = writePolicyToFile "assets/alwaysTrue-policy.plutus" freePolicyPol
 
 {-# INLINABLE  mkFreeVal #-}
 mkFreeVal :: () -> () -> ScriptContext -> Bool
@@ -49,7 +33,7 @@ freeValidator = mkValidatorScript $$(compile [|| mkWrappedFreeVal ||])
 saveFreeValidator :: IO ()
 saveFreeValidator = writeValidatorToFile "assets/alwaysTrue-validator.plutus" freeValidator
 
--- A NFT policy for the state token
+-- A simple NFT policy for the state token
 
 {-# INLINABLE mkNFTPolicy #-}
 mkNFTPolicy :: TxOutRef -> TokenName -> () -> ScriptContext -> Bool
