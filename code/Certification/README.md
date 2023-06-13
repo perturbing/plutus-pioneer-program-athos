@@ -5,7 +5,7 @@ In this folder, you will find all the tools and explanations needed for completi
 
 - [x] Write start onchain logic (Thomas)
 - [x] Write start offchain logic as a deno file similar to the `mintNFT.ts` file (Thomas)
-- [ ] Integrate offchain logic of all stages into one control flow (Thomas).
+- [x] Integrate offchain logic of all stages into one control flow (Thomas).
 - [ ] Integrate offchain burn logic in the frontend (Robertino)
 - [ ] Integrate offchain start logic in the frontend (Robertino)
 - [ ] Add explanations and usage to each section/state (Start -> Solve -> Mint -> Burn) (Thomas)

@@ -24,8 +24,9 @@ async function readScript(name: string): Promise<L.MintingPolicy> {
 }
 
 // import always true minting policy (replace this for a real NFT policy for the state token)
-const mintingScriptFree: L.MintingPolicy = await readScript("alwaysTrue-policy.plutus");
-const policyIdFree: L.PolicyId = lucid.utils.mintingPolicyToId(mintingScriptFree);
+const mintingScriptStateNFT: L.MintingPolicy = setupData.stateScript;
+const policyIdStateNFT: L.PolicyId = lucid.utils.mintingPolicyToId(mintingScriptStateNFT);
+console.log("State NFT policyId"+ policyIdStateNFT)
 
 const threadScript: L.MintingPolicy = setupData.threadScript;
 const threadPol: L.PolicyId = lucid.utils.mintingPolicyToId(threadScript);
@@ -37,11 +38,13 @@ console.log("State addr "+ stateAddress)
 
 async function initState(): Promise<L.TxHash> {
     const tkn: L.Unit = setupData.stateToken;
+    const utxo = await lucid.utxosByOutRef([{txHash:setupData.txId, outputIndex: setupData.iX}])
     const tx = await lucid
       .newTx()
+      .collectFrom(utxo)
       .mintAssets({ [tkn]: 1n}, L.Data.void())
       .payToContract(stateAddress, L.Data.to("00".repeat(1001)),{[tkn]: 1n})
-      .attachMintingPolicy(mintingScriptFree)
+      .attachMintingPolicy(mintingScriptStateNFT)
       .complete();
     const signedTx = await tx.sign().complete();
    

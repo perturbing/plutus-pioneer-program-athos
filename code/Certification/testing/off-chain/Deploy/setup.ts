@@ -9,18 +9,33 @@ const lucid = await L.Lucid.new(
   "Preview"
 );
 
-// a helper function that reads an unparametrized plutus script
-async function readScript(name: string): Promise<L.MintingPolicy> {
-    const validator = JSON.parse(await Deno.readTextFile("assets/"+ name))
-    return {
-      type: "PlutusV2",
-      script: validator.cborHex
-    }
-}
+const TxID = L.Data.Bytes();
+type TxID = L.Data.Static<typeof TxID>;
 
-// import always true minting policy (replace this for a real NFT policy for the state token)
-const mintingScriptFree: L.MintingPolicy = await readScript("alwaysTrue-policy.plutus");
-const policyIdFree: L.PolicyId = lucid.utils.mintingPolicyToId(mintingScriptFree);
+const Ix = L.Data.Integer();
+type Ix = L.Data.Static<typeof Ix>;
+
+const TokenName = L.Data.Bytes();
+type TokenName = L.Data.Static<typeof TokenName>
+
+const txID: TxID = "7f47e65bfd631e1a7126bf77f67711968beaf5b318cb9716edfd9524a3bc6eae";
+const ix: Ix = 0n;
+const tokenName: TokenName = L.fromText("PPP Cert State token");
+
+// import NFT minting policy and apply above parameters
+const NFTParams = L.Data.Tuple([TxID,Ix,TokenName]);
+type NFTParams = L.Data.Static<typeof Params>;
+const nftParameters: NFTParams = [txID,ix,tokenName]
+async function readStateNFTPolicy(): Promise<L.MintingPolicy> {
+  const script = JSON.parse(await Deno.readTextFile("assets/state-nft-policy.plutus"))
+  return {
+    type: "PlutusV2",
+    script: L.applyParamsToScript<NFTParams>(script.cborHex,nftParameters,NFTParams)
+  }
+}
+const mintingStateNFTScript: L.MintingPolicy = await readStateNFTPolicy();
+const policyStateNFT: L.PolicyID = lucid.utils.mintingPolicyToId(mintingStateNFTScript);
+console.log("State NFT policyID: "+ policyStateNFT)
 
 // start merkle tree stuff
 const startDataUint = startMerkleData.map((x) => L.fromHex(x));
@@ -30,7 +45,7 @@ const startMerkleRoot: Types.Hash = { hash: L.toHex(startMerkleTree.rootHash())}
 // setup the thread parameter from the above merkle tree
 const threadParameters: Types.ThreadParameters = {
     merkleRoot: startMerkleRoot,
-    stateSymbol: policyIdFree,
+    stateSymbol: policyStateNFT,
 }
 
 // import Thread minting policy and apply above parameters
@@ -65,6 +80,15 @@ async function readStateVal(): Promise<L.SpendingValidator> {
 const stateValidator: L.SpendingValidator = await readStateVal();
 const stateAddress: L.Address = lucid.utils.validatorToAddress(stateValidator);
 console.log("State addr "+ stateAddress)
+
+// a helper function that reads an unparametrized plutus script
+async function readScript(name: string): Promise<L.MintingPolicy> {
+  const validator = JSON.parse(await Deno.readTextFile("assets/"+ name))
+  return {
+    type: "PlutusV2",
+    script: validator.cborHex
+  }
+}
 
 // import the locking validator (this locks the reference token of the PPP Certificate NFT)
 const lockingValidator: L.SpendingValidator = await readScript("lockingValidator.plutus");
@@ -104,7 +128,10 @@ const policyIdNFT: L.PolicyId = lucid.utils.mintingPolicyToId(mintingScriptNFT);
 console.log("NFT PolicyID: "+policyIdNFT)
 
 const setup = {
-  stateToken: L.toUnit(policyIdFree, L.fromText("PPP Cert State token")),
+  txId: txID,
+  iX: Number(ix),
+  stateScript: mintingStateNFTScript,
+  stateToken: L.toUnit(policyStateNFT, tokenName),
   threadScript: threadScript,
   stateValidator: stateValidator,
   mintingScriptNFT: mintingScriptNFT 
