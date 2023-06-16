@@ -34,7 +34,7 @@ export default function StartExam() {
     type Redeemer = Data.Static<typeof Redeemer>;
 
     async function mintThreadToken() {
-        if (wAddr && lucid && participantId && cbor) {
+        if (wAddr && lucid && cbor) {
             // Participant's public key hash
             const pkh: string =
                 getAddressDetails(wAddr).paymentCredential?.hash || "";
