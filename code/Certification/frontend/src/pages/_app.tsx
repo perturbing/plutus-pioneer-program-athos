@@ -4,7 +4,7 @@ import {
     Blockfrost,
     Lucid,
     MintingPolicy,
-    SpendingValidator,
+    Network,
 } from "lucid-cardano";
 import type { AppProps } from "next/app";
 import {
@@ -17,6 +17,7 @@ import {
 
 export type AppState = {
     // Global
+    blockfrostKey?: string;
     lucid?: Lucid;
     wAddr?: Address;
     // NFT Policies
@@ -34,24 +35,31 @@ export default function App({ Component, pageProps }: AppProps) {
     const [appState, setAppState] = useState<AppState>(initialAppState);
 
     const connectLucidAndNami = async () => {
-        const lucid = await Lucid.new(
-            new Blockfrost(
-                "https://cardano-preview.blockfrost.io/api/v0",
-                "previewrWv8pxJjNdy1D4i0BCY2BdTMgzHUmSs1"
-            ),
-            "Preview"
-        );
-        if (!window.cardano.nami) {
-            window.alert("Please install Nami Wallet");
+        if (!appState.blockfrostKey) return;
+        try {
+            const network = appState.blockfrostKey.substring(0, 7);
+            const lucid = await Lucid.new(
+                new Blockfrost(
+                    `https://cardano-${network}.blockfrost.io/api/v0`,
+                    appState.blockfrostKey
+                ),
+                (network.charAt(0).toUpperCase() + network.slice(1)) as Network
+            );
+
+            if (!window.cardano.nami) {
+                window.alert("Please install Nami Wallet");
+                return;
+            }
+            const nami = await window.cardano.nami.enable();
+            lucid.selectWallet(nami);
+            setAppState({
+                ...appState,
+                lucid: lucid,
+                wAddr: await lucid.wallet.address(),
+            });
+        } catch (e) {
             return;
         }
-        const nami = await window.cardano.nami.enable();
-        lucid.selectWallet(nami);
-        setAppState({
-            ...initialAppState,
-            lucid: lucid,
-            wAddr: await lucid.wallet.address(),
-        });
     };
 
     useEffect(() => {
