@@ -1,5 +1,5 @@
 import * as L from "https://deno.land/x/lucid@0.10.1/mod.ts";
-import metadata from "../data/generic-NFT-metadata.json" assert { type: "json" };
+import metadata from "../frontend/src/data/generic-NFT-metadata.json" assert { type: "json" };
 import participants from "./participants.json" assert { type: "json" };
 
 const lucid = await L.Lucid.new(
@@ -37,7 +37,7 @@ async function generateMintMerkleTreeData(participants: JSON[]) {
 const mintData = await generateMintMerkleTreeData(participants);
 const mintDataString = `export default ${JSON.stringify(mintData)};`;
 // write the data to the data folder.
-Deno.writeTextFileSync("./data/mint-merkleTree-Data.ts", mintDataString);
+Deno.writeTextFileSync("frontend/src/data/mint-merkleTree-Data.ts", mintDataString);
 
 
 // Generating the merkle tree for the start phase
@@ -83,4 +83,4 @@ async function generateStartMerkleTreeData(participants: JSON[]) {
 const startData = await generateStartMerkleTreeData(participants);
 const startDataString = `export default ${JSON.stringify(startData)};`;
 // write the data to the data folder.
-Deno.writeTextFileSync("./data/start-merkleTree-Data.ts", startDataString);
+Deno.writeTextFileSync("frontend/src/data/start-merkleTree-Data.ts", startDataString);

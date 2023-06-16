@@ -1,6 +1,6 @@
 import * as L from "https://deno.land/x/lucid@0.10.1/mod.ts";
-import setupData from "../../../data/setupData.ts";
-import { secretSeed } from "../seed.ts";
+import setupData from "../../../frontend/src/data/setupData.ts";
+import secretSeed from "../../../../seed.js";
 
 // set blockfrost endpoint
 const lucid = await L.Lucid.new(

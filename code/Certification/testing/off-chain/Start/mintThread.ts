@@ -1,6 +1,6 @@
 import * as L from "https://deno.land/x/lucid@0.10.1/mod.ts";
 import * as Types from "../types.ts"
-import { secretSeed } from "../seed.ts";
+import secretSeed from "../../../../seed.js";
 import merkleData from "../../../data/start-merkleTree-Data.ts";
 import setupData from "../../../data/setupData.ts";
 
@@ -23,7 +23,7 @@ const addr: L.Address = await lucid.wallet.address();
 
 // define here your public key hash, participant id and exam script cbor here
 const pkh: string = L.getAddressDetails(addr).paymentCredential.hash;
-const participantId: number = 0;
+const participantId: number = 21;
 const scriptCBOR = "49480100002221200101"
 // the validator where the participant should lock their thread token
 const lockingValidatorParticipant: L.SpendingValidator = {
@@ -70,6 +70,8 @@ async function mint(): Promise<L.TxHash> {
     console.log("old state: "+L.Data.from(stateDatum))
     const newState = setBit(L.Data.from(stateDatum),participantId)
     console.log("new state: "+ newState)
+
+    console.log("statePolicy: ", )
 
     const tx = await lucid
     .newTx()
