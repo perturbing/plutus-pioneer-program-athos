@@ -39,3 +39,12 @@ library
                         Start
                         StateNFT
                         Validator
+
+executable compile-validator
+    import:           common-all
+    main-is:          Main.hs
+    build-depends:
+        base ^>=4.14.3.0,
+        certification
+    hs-source-dirs:   app
+    default-language: Haskell2010
