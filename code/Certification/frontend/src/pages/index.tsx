@@ -106,9 +106,9 @@ export default function Home() {
                         </div>
                     )}
                     <p className=" overflow-clip self-start tracking-[0.2em] mt-8 mb-2 text-md  text-zinc-200">
-                        EXAMS STARTED ({examsStartedUntilNow} of 8008):
+                        EXAMS STARTED ({examsStartedUntilNow} of 8):
                     </p>
-                    <ProgressBar progress={examsStartedUntilNow / 8008} />
+                    <ProgressBar progress={examsStartedUntilNow / 8} />
                 </div>
             </div>
 
