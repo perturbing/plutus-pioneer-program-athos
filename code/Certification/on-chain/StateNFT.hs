@@ -16,23 +16,6 @@ import           Utilities                  (wrapPolicy, writeValidatorToFile, w
 import           Prelude                    (IO)
 import           Plutus.V1.Ledger.Value     (flattenValue)
 
----------------------- The never fail validator ----------------------
--- Written for testing purposes, remove later
-
-{-# INLINABLE  mkFreeVal #-}
-mkFreeVal :: () -> () -> ScriptContext -> Bool
-mkFreeVal _dat _red _ctx = True
-
-{-# INLINABLE  mkWrappedFreeVal #-}
-mkWrappedFreeVal :: BuiltinData -> BuiltinData -> BuiltinData -> ()
-mkWrappedFreeVal = wrapValidator mkFreeVal
-
-freeValidator :: Validator
-freeValidator = mkValidatorScript $$(compile [|| mkWrappedFreeVal ||])
-
-saveFreeValidator :: IO ()
-saveFreeValidator = writeValidatorToFile "assets/alwaysTrue-validator.plutus" freeValidator
-
 -- A simple NFT policy for the state token
 
 {-# INLINABLE mkNFTPolicy #-}
