@@ -26,9 +26,7 @@ export default function MintCertificate() {
     const [name, setName] = useState<string>("");
     const [metadata, setMetadata] = useState(genericMetadata);
     const [signElsewhere, setSignElsewhere] = useState<boolean>(false);
-    const [externalPKH, setExternalPKH] = useState<string | null>(
-        "e48dea1ea0c60cfeed371d456419c10e83c72d772ec4631c73a4991e"
-    );
+    const [externalPKH, setExternalPKH] = useState<string>("");
     const [txCbor, setTxCbor] = useState<string>("");
 
     useEffect(() => {
