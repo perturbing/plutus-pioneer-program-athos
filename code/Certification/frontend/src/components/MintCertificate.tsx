@@ -18,22 +18,30 @@ import {
 import { MerkleProof } from "@/utilities/types";
 import setupData from "@/data/setupData";
 import genericMetadata from "@/data/generic-NFT-metadata.json" assert { type: "json" };
+import { SignElswhere } from "./SignElswhere";
 
 export default function MintCertificate() {
     const { appState, setAppState } = useContext(AppStateContext);
     const { lucid, wAddr } = appState;
     const [name, setName] = useState<string>("");
     const [metadata, setMetadata] = useState(genericMetadata);
+    const [signElsewhere, setSignElsewhere] = useState<boolean>(false);
+    const [externalPKH, setExternalPKH] = useState<string | null>(
+        "e48dea1ea0c60cfeed371d456419c10e83c72d772ec4631c73a4991e"
+    );
+    const [txCbor, setTxCbor] = useState<string>("");
 
     useEffect(() => {
         name && setMetadata(genPersolanizedMetadata(name));
     }, [name]);
 
-    const mintCertNFT = async () => {
+    const prepareMintCertNFT = async () => {
         console.log("minting NFT for " + wAddr);
         if (wAddr && lucid) {
-            const pkh: string =
-                getAddressDetails(wAddr).paymentCredential?.hash || "";
+            // Participant's public key hash
+            const pkh: string = signElsewhere
+                ? externalPKH || ""
+                : getAddressDetails(wAddr).paymentCredential?.hash || "";
 
             // Thread token
             const threadScript: MintingPolicy =
@@ -82,7 +90,23 @@ export default function MintCertificate() {
                 .addSignerKey(pkh)
                 .complete();
 
+            return tx;
+        }
+    };
+
+    const mintCertNFT = async () => {
+        if (wAddr && lucid) {
+            const tx = await prepareMintCertNFT();
+            if (!tx) return;
             await signAndSubmitTx(tx);
+        }
+    };
+
+    const printMintCertNFTTx = async () => {
+        if (wAddr && lucid) {
+            const tx = await prepareMintCertNFT();
+            if (!tx) return;
+            setTxCbor(tx.toString());
         }
     };
 
@@ -98,14 +122,36 @@ export default function MintCertificate() {
                 />
             </div>
 
-            <button
-                onClick={mintCertNFT}
-                disabled={!wAddr || !lucid || !name}
-                className=" bg-zinc-800 text-white font-quicksand text-lg font-bold py-3 px-8 rounded-lg shadow-[0_5px_0px_0px_rgba(0,0,0,0.6)] active:translate-y-[2px] active:shadow-[0_4px_0px_0px_rgba(0,0,0,0.6)] disabled:active:translate-y-0 disabled:active:shadow-[0_5px_0px_0px_rgba(0,0,0,0.2)] disabled:bg-zinc-200 disabled:shadow-[0_5px_0px_0px_rgba(0,0,0,0.2)] disabled:text-zinc-600"
-            >
-                {" "}
-                Mint Certificate NFT
-            </button>
+            <div className="flex flex-row w-full justify-center items-center my-8 text-lg text-zinc-800 font-quicksand ">
+                <p className="px-2">
+                    I want to sign the transaction elsewhere:
+                </p>
+                <input
+                    className="h-6 w-6"
+                    type="checkbox"
+                    checked={signElsewhere}
+                    onChange={(e) => setSignElsewhere(e.target.checked)}
+                ></input>
+            </div>
+
+            {!signElsewhere ? (
+                <button
+                    onClick={mintCertNFT}
+                    disabled={!wAddr || !lucid || !name}
+                    className=" bg-zinc-800 text-white font-quicksand text-lg font-bold py-3 px-8 rounded-lg shadow-[0_5px_0px_0px_rgba(0,0,0,0.6)] active:translate-y-[2px] active:shadow-[0_4px_0px_0px_rgba(0,0,0,0.6)] disabled:active:translate-y-0 disabled:active:shadow-[0_5px_0px_0px_rgba(0,0,0,0.2)] disabled:bg-zinc-200 disabled:shadow-[0_5px_0px_0px_rgba(0,0,0,0.2)] disabled:text-zinc-600"
+                >
+                    {" "}
+                    Mint Certificate NFT
+                </button>
+            ) : (
+                <SignElswhere
+                    externalPKH={externalPKH || ""}
+                    setExternalPKH={setExternalPKH}
+                    print={printMintCertNFTTx}
+                    txCbor={txCbor}
+                    disabled={!wAddr || !lucid || !externalPKH || !name}
+                />
+            )}
         </div>
     );
 }

@@ -157,7 +157,7 @@ export default function Home() {
             </div>
 
             {/* ACTIONS SECTION */}
-            <div className="flex flex-col items-center gap-8  h-full py-10 bg-zinc-50 w-4/5 rounded-2xl">
+            <div className="flex flex-col items-center gap-8  h-full py-10 bg-zinc-50 w-4/5 rounded-2xl scroll-auto overflow-y-scroll ">
                 {isState == "start" && <StartExam />}
                 {isState == "solve" && <SolvePage />}
                 {isState == "mint" && <MintCertificate />}
