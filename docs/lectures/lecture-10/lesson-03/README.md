@@ -1,33 +1,18 @@
-# Lesson 7.2: Marlowe Playground Demo
+# Lesson 10.3: Developing smart contracts with OpShin and PyCardano (Python)
 
-Welcome to Lesson 7.2! In this lesson, you'll learn how to get started with Marlowe Playground.
+Welcome to Lesson 10.3! In this lesson, you will learn about OpShin and PyCardano. Opshin is a simple programming language for Smart Contracts based on python. PyCardano is a standalone Cardano client written in Python that allows to create and sign transactions without depending on third-party Cardano serialization tools.
 
-{% embed url="https://youtu.be/fldaBHmYfqk" %}
+{% embed url="https://youtu.be/Ale01hnxZEg" %}
 
 {% tabs %}
-{% tab title="Learning Objectives" %}
-After completing this lesson, you'll be able to:
-
-* Employ Blockly to create a Cardano smart contract.
-* Contrast a smart contract's visual representation created with Blockly with its corresponding Marlowe code.
-* Execute Marlowe contracts in the simulation tool.
-* Run Marlowe code in combination with Haskell by using the simulation tool.
-* Describe the pros and cons of using Blockly to create smart contracts.
-
-{% endtab %}
-
-{% tab title="Lesson Resources" %}
-Internet resources mentioned in the lesson's video:
-
-* [Marlowe Playground](https://play.marlowe.iohk.io/)
-{% endtab %}
-
 {% tab title="Additional Resources" %}
 To learn more about the topics covered in this lesson, we encourage you to review the following resources:
 
-* [Marlowe Tutorials](https://docs.marlowe.iohk.io/tutorials)
+* [OpShin Website](https://opshin.opshin.dev/opshin/)
+* [OpShin on GitHub](https://github.com/OpShin/opshin)
+* [PyCardano Docs](https://pycardano.readthedocs.io/en/latest/)
+* [PyCardano on GitHub](https://github.com/Python-Cardano/pycardano)
 {% endtab %}
-
 {% endtabs %}
 
 ## Collaborate with the Pioneers Community

@@ -1,33 +1,16 @@
-# Lesson 7.2: Marlowe Playground Demo
+# Lesson 9.6: Burning Stablecoins and Liquidating Positions
 
-Welcome to Lesson 7.2! In this lesson, you'll learn how to get started with Marlowe Playground.
+Welcome to Lesson 9.6! In this lesson, you'll learn how to burn and liquidate positions for stablecoins in Cardano properly.
 
-{% embed url="https://youtu.be/fldaBHmYfqk" %}
+{% embed url="https://youtu.be/u2cUeD72MrQ" %}
 
 {% tabs %}
 {% tab title="Learning Objectives" %}
 After completing this lesson, you'll be able to:
 
-* Employ Blockly to create a Cardano smart contract.
-* Contrast a smart contract's visual representation created with Blockly with its corresponding Marlowe code.
-* Execute Marlowe contracts in the simulation tool.
-* Run Marlowe code in combination with Haskell by using the simulation tool.
-* Describe the pros and cons of using Blockly to create smart contracts.
-
+* Describe how the burn and liquidates processes work.
+* Contrast the checks required while burning and liquidating tokens.
 {% endtab %}
-
-{% tab title="Lesson Resources" %}
-Internet resources mentioned in the lesson's video:
-
-* [Marlowe Playground](https://play.marlowe.iohk.io/)
-{% endtab %}
-
-{% tab title="Additional Resources" %}
-To learn more about the topics covered in this lesson, we encourage you to review the following resources:
-
-* [Marlowe Tutorials](https://docs.marlowe.iohk.io/tutorials)
-{% endtab %}
-
 {% endtabs %}
 
 ## Collaborate with the Pioneers Community

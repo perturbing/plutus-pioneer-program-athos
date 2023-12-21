@@ -1,6 +1,6 @@
 # Lesson 6.3: Unit Testing a Smart Contract
 
-Welcome to Lesson 6.3! In this lesson, you'll learn .
+Welcome to Lesson 6.3! In this lesson, you'll learn how to use unit testing in smart contacts.
 
 {% embed url="https://youtu.be/vB8hyVq3HVo" %}
 
@@ -10,6 +10,7 @@ After completing this lesson, you'll be able to:
 
 * Explain how unit test works in Cardano.
 * Define unit test for Cardano smart contracts.
+{% endtab %}
 
 {% tab title="Additional Resources" %}
 To learn more about the topics covered in this lesson, we encourage you to review the following resources:

@@ -1,33 +1,24 @@
-# Lesson 7.2: Marlowe Playground Demo
+# Lesson 8.2: The Private Testnet
 
-Welcome to Lesson 7.2! In this lesson, you'll learn how to get started with Marlowe Playground.
+Welcome to Lesson 8.2! In this lesson, you'll learn how set up and use a private Cardano testnet.
 
-{% embed url="https://youtu.be/fldaBHmYfqk" %}
+{% embed url="https://youtu.be/BBqOZAuMx1c" %}
 
 {% tabs %}
 {% tab title="Learning Objectives" %}
 After completing this lesson, you'll be able to:
 
-* Employ Blockly to create a Cardano smart contract.
-* Contrast a smart contract's visual representation created with Blockly with its corresponding Marlowe code.
-* Execute Marlowe contracts in the simulation tool.
-* Run Marlowe code in combination with Haskell by using the simulation tool.
-* Describe the pros and cons of using Blockly to create smart contracts.
-
+* Explain what a testnet is.
+* Understand the benefits of using a testnet while developing and testing smart contacts.
+* Set up and execute a private Cardano testnet.
+* Interact with a private testnet by using Cardano CLI.
 {% endtab %}
 
 {% tab title="Lesson Resources" %}
 Internet resources mentioned in the lesson's video:
 
-* [Marlowe Playground](https://play.marlowe.iohk.io/)
+* [Cardano private testnet repository](https://github.com/woofpool/cardano-private-testnet-setup/tree/babbage)
 {% endtab %}
-
-{% tab title="Additional Resources" %}
-To learn more about the topics covered in this lesson, we encourage you to review the following resources:
-
-* [Marlowe Tutorials](https://docs.marlowe.iohk.io/tutorials)
-{% endtab %}
-
 {% endtabs %}
 
 ## Collaborate with the Pioneers Community

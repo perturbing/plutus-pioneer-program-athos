@@ -1,33 +1,16 @@
-# Lesson 7.2: Marlowe Playground Demo
+# Lecture 8 Homework Assignment: Creating a Realistic Stake Validator 
 
-Welcome to Lesson 7.2! In this lesson, you'll learn how to get started with Marlowe Playground.
+Congratulations on finishing Lecture 8! Please watch the following video to learn what's your homework to get your hands on the skills you learned in this lecture.
 
-{% embed url="https://youtu.be/fldaBHmYfqk" %}
+{% embed url="https://youtu.be/rO3FVGsuzUg" %}
 
 {% tabs %}
 {% tab title="Learning Objectives" %}
-After completing this lesson, you'll be able to:
+After completing this homework assignment, you'll be able to:
 
-* Employ Blockly to create a Cardano smart contract.
-* Contrast a smart contract's visual representation created with Blockly with its corresponding Marlowe code.
-* Execute Marlowe contracts in the simulation tool.
-* Run Marlowe code in combination with Haskell by using the simulation tool.
-* Describe the pros and cons of using Blockly to create smart contracts.
-
+* Improve a stake validator script by adding public key validation.
+* Testing a stake validator script on a private Cardano testnet.
 {% endtab %}
-
-{% tab title="Lesson Resources" %}
-Internet resources mentioned in the lesson's video:
-
-* [Marlowe Playground](https://play.marlowe.iohk.io/)
-{% endtab %}
-
-{% tab title="Additional Resources" %}
-To learn more about the topics covered in this lesson, we encourage you to review the following resources:
-
-* [Marlowe Tutorials](https://docs.marlowe.iohk.io/tutorials)
-{% endtab %}
-
 {% endtabs %}
 
 ## Collaborate with the Pioneers Community

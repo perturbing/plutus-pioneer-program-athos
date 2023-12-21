@@ -1,33 +1,17 @@
-# Lesson 7.2: Marlowe Playground Demo
+# Lesson 9.5: Minting Stablecoins
 
-Welcome to Lesson 7.2! In this lesson, you'll learn how to get started with Marlowe Playground.
+Welcome to Lesson 9.5! In this lesson, you'll learn how to mint stablecoins in Cardano.
 
-{% embed url="https://youtu.be/fldaBHmYfqk" %}
+{% embed url="https://youtu.be/mUa9sztfPKs" %}
 
 {% tabs %}
 {% tab title="Learning Objectives" %}
 After completing this lesson, you'll be able to:
 
-* Employ Blockly to create a Cardano smart contract.
-* Contrast a smart contract's visual representation created with Blockly with its corresponding Marlowe code.
-* Execute Marlowe contracts in the simulation tool.
-* Run Marlowe code in combination with Haskell by using the simulation tool.
-* Describe the pros and cons of using Blockly to create smart contracts.
-
+* Describe how the minting process works on-chain and off-chain.
+* Deploy a minting policy for stablecoins.
+* Explain how a minting policy works.
 {% endtab %}
-
-{% tab title="Lesson Resources" %}
-Internet resources mentioned in the lesson's video:
-
-* [Marlowe Playground](https://play.marlowe.iohk.io/)
-{% endtab %}
-
-{% tab title="Additional Resources" %}
-To learn more about the topics covered in this lesson, we encourage you to review the following resources:
-
-* [Marlowe Tutorials](https://docs.marlowe.iohk.io/tutorials)
-{% endtab %}
-
 {% endtabs %}
 
 ## Collaborate with the Pioneers Community

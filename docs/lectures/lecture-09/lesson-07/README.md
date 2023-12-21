@@ -1,33 +1,16 @@
-# Lesson 7.2: Marlowe Playground Demo
+# Lesson 9.7: Testing our Stablecoin's scripts
 
-Welcome to Lesson 7.2! In this lesson, you'll learn how to get started with Marlowe Playground.
+Welcome to Lesson 9.7! In this lesson, you'll learn how to test the stablecoin scripts developed in previous lessons properly.
 
-{% embed url="https://youtu.be/fldaBHmYfqk" %}
+{% embed url="https://youtu.be/-MBebK33FOU" %}
 
 {% tabs %}
 {% tab title="Learning Objectives" %}
 After completing this lesson, you'll be able to:
 
-* Employ Blockly to create a Cardano smart contract.
-* Contrast a smart contract's visual representation created with Blockly with its corresponding Marlowe code.
-* Execute Marlowe contracts in the simulation tool.
-* Run Marlowe code in combination with Haskell by using the simulation tool.
-* Describe the pros and cons of using Blockly to create smart contracts.
-
+* Understand how to create test scripts for stablecoin's scripts.
+* Identify potential scenarios where the stablecoin's scripts may fail.
 {% endtab %}
-
-{% tab title="Lesson Resources" %}
-Internet resources mentioned in the lesson's video:
-
-* [Marlowe Playground](https://play.marlowe.iohk.io/)
-{% endtab %}
-
-{% tab title="Additional Resources" %}
-To learn more about the topics covered in this lesson, we encourage you to review the following resources:
-
-* [Marlowe Tutorials](https://docs.marlowe.iohk.io/tutorials)
-{% endtab %}
-
 {% endtabs %}
 
 ## Collaborate with the Pioneers Community
